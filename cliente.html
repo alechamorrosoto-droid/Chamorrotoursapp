@@ -41,6 +41,7 @@
   <div class="wrap">
     <div id="form-pane">
       <p class="intro">Please complete the information below so we can have everything ready for your tour.</p>
+      <div id="info-tour" class="aviso" style="display:none; text-align:left; background:#0a1e2a; border-color:#0ea5e9; color:#e8f4f8; line-height:1.7;"></div>
       <div id="sin-id" class="aviso" style="display:none;">This link seems to be missing some information. Please request a new link.</div>
 
       <div id="campos">
@@ -51,18 +52,21 @@
         <input type="text" id="contacto" placeholder="e.g. +1 555 123 4567" />
 
         <label>Which tour would you like?</label>
-        <select id="tour" onchange="actualizarCamposCondicionales()">
+        <select id="tour" onchange="actualizarCamposCondicionales(); actualizarPrecioEstimado(); actualizarQueTraer();">
           <option value="">Not decided yet</option>
           <option value="kayaking">🚣 Kayaking</option>
           <option value="dolphin">🐬 Dolphin Tour</option>
           <option value="snorkeling">🤿 Snorkeling</option>
           <option value="chocolate">🍫 Chocolate & Waterfalls</option>
-          <option value="atv1">🏍 ATV – 1 Waterfall</option>
+          <option value="atv1">🏍 ATV – 1 Waterfall + Chocolate Tour</option>
           <option value="atv2">🏍 ATV – 2 Waterfalls</option>
         </select>
 
+        <div id="precio-estimado" style="display:none; background:#0d2818; border:1px solid #1e5631; color:#4ade80; border-radius:8px; padding:11px 12px; font-size:13px; margin-top:12px; font-weight:600;"></div>
+        <div id="que-traer" style="display:none; background:#0f2027; border:1px solid #2d5a80; color:#e8f4f8; border-radius:8px; padding:12px 14px; font-size:13px; margin-top:12px;"></div>
+
         <label>Number of guests</label>
-        <input type="number" id="pax" min="1" placeholder="e.g. 4" />
+        <input type="number" id="pax" min="1" placeholder="e.g. 4" oninput="actualizarPrecioEstimado()" />
 
         <label>Ages of the group</label>
         <input type="text" id="edades" placeholder="e.g. 2 adults, kids age 8 and 12" />
@@ -120,6 +124,33 @@ const params = new URLSearchParams(window.location.search);
 const tourId = params.get("id");
 if (!tourId) {
   document.getElementById("sin-id").style.display = "block";
+} else {
+  cargarInfoTour();
+}
+
+async function cargarInfoTour() {
+  try {
+    const res = await fetch(SHEET_SYNC_URL + "?action=info_tour&id=" + encodeURIComponent(tourId), { method: "GET" });
+    if (!res.ok) return;
+    const info = await res.json();
+    if (!info) return;
+
+    const box = document.getElementById("info-tour");
+    const lineas = [];
+    lineas.push("<div style='font-weight:700; margin-bottom:6px;'>🌴 Your tour</div>");
+    if (info.tipoLabel) lineas.push("Tour: " + info.tipoLabel);
+    if (info.fechaHora) {
+      const d = new Date(info.fechaHora);
+      lineas.push("Date: " + d.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" }));
+      lineas.push("Time: " + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }));
+    }
+    if (info.ubicacion) lineas.push("Meeting point: " + info.ubicacion);
+    if (info.guiaNombre) lineas.push("Guide: " + info.guiaNombre);
+    if (lineas.length <= 1) return;
+
+    box.innerHTML = lineas.join("<br>");
+    box.style.display = "block";
+  } catch (e) { /* si falla, el formulario sigue funcionando igual */ }
 }
 
 function v(id) { return document.getElementById(id).value.trim(); }
@@ -127,10 +158,56 @@ function v(id) { return document.getElementById(id).value.trim(); }
 const TOURS_AGUA = ["kayaking", "dolphin", "snorkeling"];
 const TOURS_ATV = ["atv1", "atv2"];
 
+const PRECIOS = {
+  kayaking: { pax: 65 },
+  dolphin: { pax: 120 },
+  snorkeling: { pax: 90 },
+  chocolate: { pax: 80 },
+  atv1: { compartido: 140, solo: 190 },
+  atv2: { compartido: 120, solo: 180 },
+};
+
+function actualizarPrecioEstimado() {
+  const tour = v("tour");
+  const pax = Number(v("pax")) || 0;
+  const box = document.getElementById("precio-estimado");
+  const precios = PRECIOS[tour];
+  if (!precios) { box.style.display = "none"; return; }
+
+  let texto;
+  if (precios.pax) {
+    texto = "💵 Price: $" + precios.pax + " per person";
+    if (pax > 0) texto += " · Total: $" + (precios.pax * pax);
+  } else {
+    texto = "💵 Price: $" + precios.compartido + "/person (shared quad) or $" + precios.solo + "/person (private quad)";
+  }
+  box.textContent = texto;
+  box.style.display = "block";
+}
+
 function actualizarCamposCondicionales() {
   const tour = v("tour");
   document.getElementById("campo-nadar").style.display = TOURS_AGUA.includes(tour) ? "block" : "none";
   document.getElementById("campo-peso").style.display = TOURS_ATV.includes(tour) ? "block" : "none";
+}
+
+const QUE_TRAER = {
+  kayaking: ["Swimsuit", "Water shoes or sandals with straps", "Towel", "Reef-safe sunscreen", "Change of clothes", "Waterproof bag for valuables"],
+  dolphin: ["Swimsuit", "Water shoes", "Towel", "Reef-safe sunscreen", "Motion sickness medication, if needed", "Waterproof bag for valuables"],
+  snorkeling: ["Swimsuit", "Water shoes", "Towel", "Reef-safe sunscreen", "Waterproof bag for valuables"],
+  chocolate: ["Comfortable walking shoes", "Swimsuit (for the waterfall)", "Towel", "Insect repellent", "Light rain jacket (optional)"],
+  atv1: ["Closed-toe shoes", "Clothes you don't mind getting dirty or wet", "Sunscreen", "Insect repellent", "Swimsuit (for the waterfall stop)"],
+  atv2: ["Closed-toe shoes", "Clothes you don't mind getting dirty or wet", "Sunscreen", "Insect repellent", "Swimsuit (for the waterfall stops)"],
+};
+
+function actualizarQueTraer() {
+  const tour = v("tour");
+  const box = document.getElementById("que-traer");
+  const lista = QUE_TRAER[tour];
+  if (!lista) { box.style.display = "none"; return; }
+  box.innerHTML = "<div style='font-weight:700; margin-bottom:6px;'>🎒 What to bring</div><ul style='padding-left:18px; line-height:1.6; margin:0;'>"
+    + lista.map(item => "<li>" + item + "</li>").join("") + "</ul>";
+  box.style.display = "block";
 }
 
 async function enviar() {
