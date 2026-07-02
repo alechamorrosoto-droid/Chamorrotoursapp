@@ -714,7 +714,7 @@ function App() {
 
   function save(key, updated) { localStorage.setItem("chamorro_tours_data", JSON.stringify(updated)); return updated; }
   function mesKeyDeFecha(fecha) { const [y, m] = (fecha || "").split("-"); return y && m ? y + "-" + m : null; }
-  function addTour(tour) {
+  function addTour(tour, leadId) {
     const k = mesKeyDeFecha(tour.fecha);
     setMeses(p => {
       let base = p;
@@ -722,7 +722,9 @@ function App() {
       const key = (k && base[k]) ? k : mesActivo;
       return save(key, { ...base, [key]: { ...base[key], tours: [...base[key].tours, tour] } });
     });
-    syncTourASheets(tour); setPanel(null);
+    syncTourASheets(tour);
+    if (leadId) setLeads(p => saveLeads(p.map(l => l.id === leadId ? { ...l, estado: "Convertido" } : l)));
+    setPanel(null);
   }
   function updateTour(tour) {
     const keyDestino = mesKeyDeFecha(tour.fecha);
@@ -758,11 +760,27 @@ function App() {
   function mergeLeadsRemotos(remotos) {
     let nuevos = 0;
     setLeads(p => {
-      const ids = new Set(p.map(l => String(l.id)));
       const eliminados = getEliminados();
-      const aAgregar = remotos.filter(r => r && r.id && !ids.has(String(r.id)) && !eliminados.has(String(r.id)));
-      nuevos = aAgregar.length;
-      return aAgregar.length ? saveLeads([...p, ...aAgregar]) : p;
+      const localById = new Map(p.map(l => [String(l.id), l]));
+      const idsRemotos = new Set();
+      const resultado = [];
+      remotos.forEach(r => {
+        if (!r || !r.id || eliminados.has(String(r.id))) return;
+        idsRemotos.add(String(r.id));
+        const local = localById.get(String(r.id));
+        if (local) {
+          // Actualiza con los datos frescos de la Sheet, pero conserva el estado
+          // que el usuario haya puesto localmente (ej. "Convertido"), ya que ese
+          // cambio nunca se escribe de vuelta a la Sheet.
+          resultado.push({ ...r, estado: local.estado || r.estado });
+        } else {
+          nuevos++;
+          resultado.push(r);
+        }
+      });
+      // Conserva leads locales que por alguna razón no vinieron en esta respuesta.
+      p.forEach(l => { if (!idsRemotos.has(String(l.id)) && !eliminados.has(String(l.id))) resultado.push(l); });
+      return saveLeads(resultado);
     });
     return nuevos;
   }
@@ -770,7 +788,6 @@ function App() {
   function updateLead(lead) { setLeads(p => saveLeads(p.map(l => l.id === lead.id ? lead : l))); setPanel({ tipo: "leads" }); }
   function deleteLead(id) { addEliminado(id); setLeads(p => saveLeads(p.filter(l => l.id !== id))); setPanel({ tipo: "leads" }); }
   function convertirLead(lead) {
-    setLeads(p => saveLeads(p.map(l => l.id === lead.id ? { ...l, estado: "Convertido" } : l)));
     const k = mesKeyDeFecha(lead.fecha);
     if (k && meses[k]) setMesActivo(k);
     const notas = [
@@ -783,7 +800,8 @@ function App() {
     setPanel({
       tipo: "form",
       dia: lead.fecha || (year + "-" + String(month).padStart(2, "0") + "-01"),
-      prefill: { cliente: lead.huesped + (lead.unidad ? " (" + lead.unidad + ")" : ""), pax: lead.pax || "", tipoKey: lead.tourInteres || "kayaking", notas }
+      prefill: { cliente: lead.huesped + (lead.unidad ? " (" + lead.unidad + ")" : ""), pax: lead.pax || "", tipoKey: lead.tourInteres || "kayaking", notas },
+      leadId: lead.id,
     });
   }
 
@@ -879,7 +897,7 @@ function App() {
         React.createElement("div", { style: { width: 36, height: 4, background: "#1e3a4a", borderRadius: 2, margin: "12px auto 4px" } }),
         panel.tipo === "detalle" ? React.createElement(TourDetalle, { tour: panel.tour, onClose: () => setPanel(null), onDelete: deleteTour, onEdit: t => setPanel({ tipo: "form", dia: t.fecha, tour: t }) }) : null,
         panel.tipo === "lista" ? React.createElement(DayList, { tours: panel.tours, onSelect: t => setPanel({ tipo: "detalle", tour: t }), onAdd: () => setPanel({ tipo: "form", dia: panel.dia }), onClose: () => setPanel(null) }) : null,
-        panel.tipo === "form" ? React.createElement(TourForm, { onSave: panel.tour ? updateTour : addTour, onCancel: () => setPanel(null), fechaInicial: panel.dia, tourToEdit: panel.tour, prefill: panel.prefill }) : null,
+        panel.tipo === "form" ? React.createElement(TourForm, { onSave: panel.tour ? updateTour : (t) => addTour(t, panel.leadId), onCancel: () => setPanel(null), fechaInicial: panel.dia, tourToEdit: panel.tour, prefill: panel.prefill }) : null,
         panel.tipo === "leads" ? React.createElement(LeadsView, { leads, onAdd: () => setPanel({ tipo: "leadForm" }), onOpen: l => setPanel({ tipo: "leadForm", lead: l }), onClose: () => setPanel(null), onSync: mergeLeadsRemotos }) : null,
         panel.tipo === "leadForm" ? React.createElement(LeadForm, { onSave: panel.lead ? updateLead : addLead, onCancel: () => setPanel({ tipo: "leads" }), leadToEdit: panel.lead, onConvert: convertirLead, onDelete: deleteLead }) : null,
         panel.tipo === "ajustes" ? React.createElement(AjustesView, { meses, onClose: () => setPanel(null) }) : null
