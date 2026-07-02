@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Chamorro Tours" />
+  <title>Chamorro Tours</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #070f16; font-family: -apple-system, 'Inter', system-ui, sans-serif; }
+    input, select, button { font-family: inherit; }
+    input[type=number]::-webkit-inner-spin-button { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+  <script>
+const { useState, useMemo } = React;
+
+const TIPOS_TOUR = {
+  kayaking:     { label: "🚣 Kayaking",              precioPax: 65,  duracion: "2 horas",   esAtv: false, gastos: ["fruta","kayaks","otros"] },
+  dolphin:      { label: "🐬 Dolphin Tour",           precioPax: 120, duracion: "3 horas",   esAtv: false, gastos: ["fruta","transporte","otros"] },
+  snorkeling:   { label: "🤿 Snorkeling",             precioPax: 90,  duracion: "2 horas",   esAtv: false, gastos: ["fruta","transporte","otros"] },
+  chocolate:    { label: "🍫 Chocolate & Waterfalls", precioPax: 80,  duracion: "4-5 horas", esAtv: false, gastos: ["fruta","transporte","entradas","otros"] },
+  atv1:         { label: "🏍 ATV 1 Catarata",         precioPax: 140, precioSolo: 190, duracion: "5 horas", esAtv: true,  gastos: ["fruta","transporte","entradas","otros"] },
+  atv2:         { label: "🏍 ATV 2 Cataratas",        precioPax: 120, precioSolo: 180, duracion: "5 horas", esAtv: true,  gastos: ["fruta","transporte","entradas","otros"] },
+  personalizado:{ label: "✏️ Personalizado",           precioPax: 0,   duracion: "",          esAtv: false, gastos: ["fruta","transporte","kayaks","entradas","otros"] },
+};
+
+const GUIAS = ["José Calderón", "David Angulo", "Santiago Miranda"];
+const METODOS_PAGO = ["Transferencia", "Efectivo", "Tarjeta", "SINPE"];
+const ESTADOS_PAGO = ["Pendiente", "Parcial", "Pagado"];
+const ESTADO_PAGO_COLOR = { Pendiente: "#f87171", Parcial: "#f59e0b", Pagado: "#4ade80" };
+
+// ── SYNC CON GOOGLE SHEETS ───────────────────────────────────────────────────
+const SHEET_SYNC_URL = "https://script.google.com/macros/s/AKfycbxN_bxd5yxGWryQ-pMCqudxvN3vos4IibGqJsUofjbFVoRbJO0kw1gyoO2FNRWUYho49Q/exec";
+function syncTourASheets(tour) {
+  try {
+    fetch(SHEET_SYNC_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ ...tour, tipoLabel: TIPOS_TOUR[tour.tipo]?.label || tour.tipo })
+    });
+  } catch (err) { console.warn("No se pudo sincronizar con Sheets:", err); }
+}
+async function traerLeadsDeSheets() {
+  const res = await fetch(SHEET_SYNC_URL + "?action=leads", { method: "GET" });
+  if (!res.ok) throw new Error("Respuesta " + res.status);
+  const data = await res.json();
+  if (!Array.isArray(data)) throw new Error("Formato inesperado");
+  return data;
+}
+const COLS_GASTOS = ["fruta","transporte","kayaks","entradas","otros"];
+const COLS_LABEL = { fruta: "🍍 Fruta", transporte: "🚐 Transporte", kayaks: "🚣 Kayaks", entradas: "🎟 Entradas", otros: "📦 Otros" };
+const COMISION_DEFAULT = 10;
+const DIAS = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+
+// ── RESPALDO / RESTAURACIÓN ──────────────────────────────────────────────────
+function exportarRespaldo() {
+  const data = {
+    version: 1,
+    exportado: new Date().toISOString(),
+    tours: JSON.parse(localStorage.getItem("chamorro_tours_data") || "null"),
+    leads: JSON.parse(localStorage.getItem("chamorro_leads_data") || "[]"),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "ChamorroTours_respaldo_" + new Date().toISOString().split("T")[0] + ".json";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function importarRespaldo(file, onDone) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!data.tours && !data.leads) throw new Error("Formato no reconocido");
+      if (!confirm("Esto reemplazará los datos actuales con el respaldo del " + (data.exportado ? data.exportado.split("T")[0] : "?") + ". ¿Continuar?")) return;
+      if (data.tours) localStorage.setItem("chamorro_tours_data", JSON.stringify(data.tours));
+      if (data.leads) localStorage.setItem("chamorro_leads_data", JSON.stringify(data.leads));
+      onDone();
+    } catch (err) { alert("No se pudo leer el respaldo: " + err.message); }
+  };
+  reader.readAsText(file);
+}
+
+function diaSemana(fechaStr) {
+  const dias = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+  const [y, m, d] = fechaStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dias[dt.getDay()];
+}
+
+// ── COMPARTIR POR WHATSAPP ───────────────────────────────────────────────────
+function compartirWhatsApp(tour) {
+  const ti = TIPOS_TOUR[tour.tipo] || TIPOS_TOUR.personalizado;
+  const lineas = [
+    "🌿 " + tour.guiaNombre + " – " + ti.label.replace(/^\S+ /, "") + " (" + tour.pax + " pax)",
+    "📅 " + tour.fecha + " (" + diaSemana(tour.fecha) + ")" + (tour.hora ? " · 🕐 " + tour.hora : ""),
+    "👤 Cliente: " + tour.cliente,
+    tour.puntoEncuentro ? "📍 Punto de encuentro: " + tour.puntoEncuentro : "",
+    tour.contactoCliente ? "📞 Contacto: " + tour.contactoCliente : "",
+    ti.duracion ? "⏱ Duración: " + ti.duracion : "",
+    tour.notas ? "\n" + tour.notas : "",
+  ].filter(Boolean);
+  const url = "https://wa.me/?text=" + encodeURIComponent(lineas.join("\n"));
+  window.open(url, "_blank");
+}
+
+const MESES_INIT = {
+  "2026-06": { label: "Junio 2026",      year: 2026, month: 6,  tours: [
+    { id: 1, tipo: "kayaking", fecha: "2026-06-25", cliente: "Casas del Caribe", pax: 8, precioPax: 65,  ingreso: 520,  comisionPct: 10, comisionUSD: 52,  pagoGuia: 100, fruta: 15, transporte: 0,   kayaks: 100, entradas: 0,   otros: 0,  gastoTotal: 267, ganancia: 253, metodoPago: "Transferencia", guiaNombre: "David Angulo" },
+    { id: 2, tipo: "atv1",     fecha: "2026-06-26", cliente: "Casas del Caribe", pax: 8, precioPax: 140, ingreso: 1120, comisionPct: 10, comisionUSD: 112, pagoGuia: 100, fruta: 15, transporte: 250, kayaks: 0,   entradas: 128, otros: 40, gastoTotal: 645, ganancia: 475, metodoPago: "Transferencia", guiaNombre: "David Angulo" },
+  ]},
+  "2026-07": { label: "Julio 2026",      year: 2026, month: 7,  tours: [] },
+  "2026-08": { label: "Agosto 2026",     year: 2026, month: 8,  tours: [] },
+  "2026-09": { label: "Septiembre 2026", year: 2026, month: 9,  tours: [] },
+  "2026-10": { label: "Octubre 2026",    year: 2026, month: 10, tours: [] },
+};
+
+function fmt(n) {
+  if (!n && n !== 0) return "—";
+  return "$" + Number(n).toLocaleString("es-CR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+function getDiasCalendario(year, month) {
+  const firstDay = new Date(year, month - 1, 1).getDay();
+  const offset = firstDay === 0 ? 6 : firstDay - 1;
+  const totalDays = new Date(year, month, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < offset; i++) cells.push(null);
+  for (let d = 1; d <= totalDays; d++) cells.push(d);
+  return cells;
+}
+
+function calcTour(f, tipoKey) {
+  const tipo = TIPOS_TOUR[tipoKey] || {};
+  let ingreso = 0, paxTotal = 0;
+  if (tipo.esAtv) {
+    const compartido = Number(f.paxCompartido) || 0;
+    const solo = Number(f.paxSolo) || 0;
+    ingreso = compartido * Number(f.precioPax || tipo.precioPax || 0) + solo * Number(f.precioSolo || tipo.precioSolo || 0);
+    paxTotal = compartido + solo;
+  } else {
+    paxTotal = Number(f.pax) || 0;
+    ingreso = paxTotal * (Number(f.precioPax) || 0);
+  }
+  const comisionUSD = ingreso * ((Number(f.comisionPct) || 0) / 100);
+  const gastosItems = COLS_GASTOS.reduce((s, k) => s + (Number(f[k]) || 0), 0);
+  const gastoTotal = gastosItems + (Number(f.pagoGuia) || 0) + comisionUSD;
+  return { ingreso, comisionUSD, gastoTotal, ganancia: ingreso - gastoTotal, paxTotal };
+}
+
+async function exportarExcel(meses) {
+  const wb = new ExcelJS.Workbook();
+  const COLS = [
+    { header: "Fecha", key: "fecha", width: 12 },
+    { header: "Cliente", key: "cliente", width: 20 },
+    { header: "Pax", key: "pax", width: 6 },
+    { header: "Precio/Pax", key: "precioPax", width: 12 },
+    { header: "Ingreso", key: "ingreso", width: 12 },
+    { header: "Comisión %", key: "comisionPct", width: 10 },
+    { header: "Comisión $", key: "comisionUSD", width: 12 },
+    { header: "Pago Guía", key: "pagoGuia", width: 12 },
+    { header: "Guía", key: "guiaNombre", width: 18 },
+    { header: "Fruta", key: "fruta", width: 9 },
+    { header: "Transporte", key: "transporte", width: 12 },
+    { header: "Kayaks", key: "kayaks", width: 9 },
+    { header: "Entradas", key: "entradas", width: 10 },
+    { header: "Otros", key: "otros", width: 9 },
+    { header: "Gasto Total", key: "gastoTotal", width: 12 },
+    { header: "Ganancia", key: "ganancia", width: 12 },
+    { header: "Estado Pago", key: "estadoPago", width: 12 },
+    { header: "Tipo Tour", key: "tipoTour", width: 20 },
+  ];
+  const MONEY_KEYS = ["precioPax","ingreso","comisionUSD","pagoGuia","fruta","transporte","kayaks","entradas","otros","gastoTotal","ganancia"];
+
+  let huboDatos = false;
+  Object.values(meses).forEach(({ label, tours }) => {
+    if (!tours.length) return;
+    huboDatos = true;
+    const ws = wb.addWorksheet(label, { views: [{ state: "frozen", ySplit: 1 }] });
+    ws.columns = COLS;
+
+    ws.getRow(1).eachCell(cell => {
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0369A1" } };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+    });
+
+    tours.forEach((t, i) => {
+      const row = ws.addRow({
+        fecha: t.fecha, cliente: t.cliente, pax: t.pax, precioPax: t.precioPax,
+        ingreso: t.ingreso, comisionPct: t.comisionPct, comisionUSD: t.comisionUSD,
+        pagoGuia: t.pagoGuia||0, guiaNombre: t.guiaNombre, fruta: t.fruta||0,
+        transporte: t.transporte||0, kayaks: t.kayaks||0, entradas: t.entradas||0,
+        otros: t.otros||0, gastoTotal: t.gastoTotal, ganancia: t.ganancia,
+        estadoPago: t.estadoPago || "Pendiente",
+        tipoTour: TIPOS_TOUR[t.tipo]?.label || t.tipo
+      });
+      if (i % 2 === 1) row.eachCell(cell => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F8FF" } }; });
+      row.getCell("ganancia").font = { bold: true, color: { argb: t.ganancia >= 0 ? "FF15803D" : "FFDC2626" } };
+      MONEY_KEYS.forEach(k => { row.getCell(k).numFmt = "$#,##0.00"; });
+      row.getCell("comisionPct").numFmt = '0"%"';
+    });
+
+    const tot = tours.reduce((a,t) => ({ ingreso: a.ingreso+t.ingreso, gastoTotal: a.gastoTotal+t.gastoTotal, ganancia: a.ganancia+t.ganancia, comisionUSD: a.comisionUSD+t.comisionUSD, pagoGuia: a.pagoGuia+(t.pagoGuia||0) }), { ingreso:0, gastoTotal:0, ganancia:0, comisionUSD:0, pagoGuia:0 });
+    const totalRow = ws.addRow({ fecha: "TOTAL DEL MES", ingreso: tot.ingreso, comisionUSD: tot.comisionUSD, pagoGuia: tot.pagoGuia, gastoTotal: tot.gastoTotal, ganancia: tot.ganancia });
+    totalRow.eachCell({ includeEmpty: true }, cell => {
+      cell.font = { bold: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFC8E6C9" } };
+      cell.border = { top: { style: "thin", color: { argb: "FF1B5E20" } } };
+    });
+    MONEY_KEYS.forEach(k => { totalRow.getCell(k).numFmt = "$#,##0.00"; });
+
+    ws.eachRow(row => row.eachCell({ includeEmpty: true }, cell => {
+      cell.border = { ...(cell.border||{}), bottom: { style: "hair", color: { argb: "FFE2E8F0" } } };
+    }));
+  });
+
+  if (!huboDatos) return alert("No hay tours para exportar.");
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "Chamorro_Tours_2026.xlsx";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── FORM ─────────────────────────────────────────────────────────────────────
+function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill }) {
+  const [tipoKey, setTipoKey] = React.useState(tourToEdit ? tourToEdit.tipo : (prefill?.tipoKey || "kayaking"));
+  const tipo = TIPOS_TOUR[tipoKey];
+  const [f, setF] = React.useState(() => tourToEdit ? {
+    fecha: tourToEdit.fecha, hora: tourToEdit.hora || "", puntoEncuentro: tourToEdit.puntoEncuentro || "", contactoCliente: tourToEdit.contactoCliente || "", cliente: tourToEdit.cliente,
+    pax: tourToEdit.pax || "", paxCompartido: tourToEdit.paxCompartido || "", paxSolo: tourToEdit.paxSolo || "",
+    precioPax: tourToEdit.precioPax, precioSolo: tourToEdit.precioSolo || 0,
+    comisionPct: tourToEdit.comisionPct, pagoGuia: tourToEdit.pagoGuia,
+    fruta: tourToEdit.fruta||0, transporte: tourToEdit.transporte||0, kayaks: tourToEdit.kayaks||0, entradas: tourToEdit.entradas||0, otros: tourToEdit.otros||0,
+    metodoPago: tourToEdit.metodoPago, guiaNombre: tourToEdit.guiaNombre, notas: tourToEdit.notas || "", estadoPago: tourToEdit.estadoPago || "Pendiente",
+  } : {
+    fecha: fechaInicial || new Date().toISOString().split("T")[0],
+    hora: "", puntoEncuentro: "", contactoCliente: "",
+    cliente: prefill?.cliente || "", pax: prefill?.pax || "", paxCompartido: "", paxSolo: "",
+    precioPax: tipo.precioPax, precioSolo: tipo.precioSolo || 0,
+    comisionPct: COMISION_DEFAULT, pagoGuia: 0,
+    fruta: 0, transporte: 0, kayaks: 0, entradas: 0, otros: 0,
+    metodoPago: "Transferencia", guiaNombre: "David Angulo", notas: prefill?.notas || "", estadoPago: "Pendiente",
+  });
+  const h = (k, v) => setF(p => ({ ...p, [k]: v }));
+  function changeTipo(key) {
+    setTipoKey(key);
+    const t = TIPOS_TOUR[key];
+    setF(p => ({ ...p, precioPax: t.precioPax || p.precioPax, precioSolo: t.precioSolo || 0, paxCompartido: "", paxSolo: "" }));
+  }
+  const { ingreso, comisionUSD, gastoTotal, ganancia, paxTotal } = calcTour(f, tipoKey);
+
+  function save() {
+    if (tipo.esAtv) { if (!f.fecha || !f.cliente || (!f.paxCompartido && !f.paxSolo)) return; }
+    else { if (!f.fecha || !f.cliente || !f.pax || !f.precioPax) return; }
+    onSave({ ...f, id: tourToEdit ? tourToEdit.id : Date.now(), tipo: tipoKey, pax: paxTotal,
+      paxCompartido: Number(f.paxCompartido)||0, paxSolo: Number(f.paxSolo)||0,
+      precioPax: Number(f.precioPax), precioSolo: Number(f.precioSolo)||0,
+      pagoGuia: Number(f.pagoGuia), fruta: Number(f.fruta), transporte: Number(f.transporte),
+      kayaks: Number(f.kayaks), entradas: Number(f.entradas), otros: Number(f.otros),
+      ingreso, comisionUSD, gastoTotal, ganancia });
+  }
+
+  const inp = { width: "100%", background: "#0f2027", border: "1px solid #2d5a80", borderRadius: 6, padding: "8px 10px", color: "#e8f4f8", fontSize: 13, boxSizing: "border-box" };
+  const lbl = { fontSize: 11, color: "#7ec8e3", display: "block", marginBottom: 3 };
+
+  return React.createElement("div", { style: { padding: 20 } },
+    React.createElement("p", { style: { color: "#7ec8e3", fontWeight: 700, marginBottom: 14, fontSize: 13, letterSpacing: 1, textTransform: "uppercase" } }, tourToEdit ? "✏️ Editar Tour" : "+ Nuevo Tour"),
+    React.createElement("div", { style: { marginBottom: 16 } },
+      React.createElement("label", { style: { ...lbl, marginBottom: 6 } }, "TIPO DE TOUR"),
+      React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
+        ...Object.entries(TIPOS_TOUR).map(([key, t]) =>
+          React.createElement("button", {
+            key, onClick: () => changeTipo(key),
+            style: { background: tipoKey === key ? "linear-gradient(135deg,#0ea5e9,#0369a1)" : "#0f2027", border: tipoKey === key ? "none" : "1px solid #1e3a4a", borderRadius: 7, padding: "7px 12px", color: tipoKey === key ? "#fff" : "#7ec8e3", fontSize: 12, fontWeight: tipoKey === key ? 700 : 400, cursor: "pointer" }
+          }, t.label, t.precioPax > 0 ? React.createElement("span", { style: { marginLeft: 4, opacity: 0.7, fontSize: 11 } }, fmt(t.precioPax)) : null)
+        )
+      ),
+      tipo.duracion ? React.createElement("div", { style: { fontSize: 11, color: "#475569", marginTop: 6 } }, "⏱ " + tipo.duracion) : null
+    ),
+    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 14, marginBottom: 16 } },
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Fecha"),
+        React.createElement("input", { type: "date", value: f.fecha, onChange: e => h("fecha", e.target.value), style: inp })
+      ),
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Hora del tour"),
+        React.createElement("input", { type: "time", value: f.hora, onChange: e => h("hora", e.target.value), style: inp })
+      ),
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Cliente"),
+        React.createElement("input", { type: "text", value: f.cliente, onChange: e => h("cliente", e.target.value), style: inp, placeholder: "Ej: Casas del Caribe" })
+      ),
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Punto de encuentro / pickup"),
+        React.createElement("input", { type: "text", value: f.puntoEncuentro, onChange: e => h("puntoEncuentro", e.target.value), style: inp, placeholder: "Ej: Lobby Casas del Caribe" })
+      ),
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Contacto del cliente (opcional)"),
+        React.createElement("input", { type: "text", value: f.contactoCliente, onChange: e => h("contactoCliente", e.target.value), style: inp, placeholder: "Ej: +506 8888-8888" })
+      )
+    ),
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 16 } },
+      tipo.esAtv ? [
+        React.createElement("div", { key: "compartido" },
+          React.createElement("label", { style: lbl }, "Pax quad compartido"),
+          React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
+            React.createElement("input", { type: "number", value: f.paxCompartido, onChange: e => h("paxCompartido", e.target.value), style: { ...inp, flex: 1 } }),
+            React.createElement("span", { style: { fontSize: 11, color: "#475569", whiteSpace: "nowrap" } }, fmt(tipo.precioPax) + "/pax")
+          )
+        ),
+        React.createElement("div", { key: "solo" },
+          React.createElement("label", { style: lbl }, "Pax quad solo"),
+          React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
+            React.createElement("input", { type: "number", value: f.paxSolo, onChange: e => h("paxSolo", e.target.value), style: { ...inp, flex: 1 } }),
+            React.createElement("span", { style: { fontSize: 11, color: "#475569", whiteSpace: "nowrap" } }, fmt(tipo.precioSolo) + "/pax")
+          )
+        )
+      ] : [
+        React.createElement("div", { key: "pax" },
+          React.createElement("label", { style: lbl }, "# Pax"),
+          React.createElement("input", { type: "number", value: f.pax, onChange: e => h("pax", e.target.value), style: inp })
+        ),
+        React.createElement("div", { key: "precio" },
+          React.createElement("label", { style: lbl }, "Precio/Pax $"),
+          React.createElement("input", { type: "number", value: f.precioPax, onChange: e => h("precioPax", e.target.value), style: inp })
+        )
+      ],
+      ...["comisionPct","pagoGuia",
+        ...(tipo.gastos.includes("fruta") ? ["fruta"] : []),
+        ...(tipo.gastos.includes("transporte") ? ["transporte"] : []),
+        ...(tipo.gastos.includes("kayaks") ? ["kayaks"] : []),
+        ...(tipo.gastos.includes("entradas") ? ["entradas"] : []),
+        ...(tipo.gastos.includes("otros") ? ["otros"] : []),
+      ].map(k => React.createElement("div", { key: k },
+        React.createElement("label", { style: lbl }, { comisionPct:"Comisión %", pagoGuia:"Pago Guía $", fruta:"Fruta $", transporte:"Transporte $", kayaks:"Renta Kayaks $", entradas:"Entradas $", otros:"Otros $" }[k]),
+        React.createElement("input", { type: "number", value: f[k], onChange: e => h(k, e.target.value), style: inp })
+      )),
+      React.createElement("div", { key: "guia" },
+        React.createElement("label", { style: lbl }, "Guía"),
+        React.createElement("select", { value: f.guiaNombre, onChange: e => h("guiaNombre", e.target.value), style: inp },
+          ...GUIAS.map(g => React.createElement("option", { key: g }, g))
+        )
+      ),
+      React.createElement("div", { key: "pago" },
+        React.createElement("label", { style: lbl }, "Método de Pago"),
+        React.createElement("select", { value: f.metodoPago, onChange: e => h("metodoPago", e.target.value), style: inp },
+          ...METODOS_PAGO.map(m => React.createElement("option", { key: m }, m))
+        )
+      ),
+      React.createElement("div", { key: "estadoPago" },
+        React.createElement("label", { style: lbl }, "Estado del Pago"),
+        React.createElement("select", { value: f.estadoPago, onChange: e => h("estadoPago", e.target.value), style: { ...inp, border: "1px solid " + (ESTADO_PAGO_COLOR[f.estadoPago] || "#2d5a80") } },
+          ...ESTADOS_PAGO.map(s => React.createElement("option", { key: s }, s))
+        )
+      )
+    ),
+    React.createElement("div", { style: { marginTop: 14 } },
+      React.createElement("label", { style: lbl }, "Notas (alergias, idioma, edades, preferencias...)"),
+      React.createElement("textarea", { value: f.notas, onChange: e => h("notas", e.target.value), style: { ...inp, minHeight: 60, resize: "vertical" } })
+    ),
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginTop: 14, padding: 12, background: "#0a1e2a", borderRadius: 10 } },
+      ...[ ["Ingreso",ingreso,"#7ec8e3"], ["Comisión",comisionUSD,"#a78bfa"], ["Gastos",gastoTotal,"#f59e0b"], ["Ganancia",ganancia,ganancia>=0?"#4ade80":"#f87171"] ]
+        .map(([l,v,c]) => React.createElement("div", { key: l, style: { textAlign: "center" } },
+          React.createElement("div", { style: { fontSize: 10, color: "#475569", marginBottom: 3 } }, l),
+          React.createElement("div", { style: { fontSize: 15, fontWeight: 800, color: c } }, fmt(v))
+        ))
+    ),
+    React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 14 } },
+      React.createElement("button", { onClick: save, style: { flex: 1, background: "linear-gradient(135deg,#0ea5e9,#0369a1)", color: "#fff", border: "none", borderRadius: 8, padding: 12, fontWeight: 700, cursor: "pointer", fontSize: 14 } }, tourToEdit ? "Guardar Cambios" : "Guardar Tour"),
+      React.createElement("button", { onClick: onCancel, style: { flex: 1, background: "transparent", color: "#7ec8e3", border: "1px solid #1e4060", borderRadius: 8, padding: 12, cursor: "pointer", fontSize: 14 } }, "Cancelar")
+    )
+  );
+}
+
+// ── DETALLE ───────────────────────────────────────────────────────────────────
+function TourDetalle({ tour, onClose, onDelete, onEdit }) {
+  const tipoInfo = TIPOS_TOUR[tour.tipo] || TIPOS_TOUR.personalizado;
+  const paxText = tipoInfo.esAtv && (tour.paxCompartido > 0 || tour.paxSolo > 0)
+    ? [tour.paxCompartido > 0 ? tour.paxCompartido + " compartido" : "", tour.paxSolo > 0 ? tour.paxSolo + " solo" : ""].filter(Boolean).join(" · ")
+    : tour.pax + " pax";
+
+  return React.createElement("div", { style: { padding: 20 } },
+    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 } },
+      React.createElement("div", null,
+        React.createElement("div", { style: { display: "inline-flex", alignItems: "center", gap: 6, background: "linear-gradient(135deg,#0ea5e920,#0369a120)", border: "1px solid #0ea5e950", borderRadius: 8, padding: "4px 10px", marginBottom: 8 } },
+          React.createElement("span", { style: { fontSize: 13, color: "#7ec8e3", fontWeight: 700 } }, tipoInfo.label),
+          tipoInfo.duracion ? React.createElement("span", { style: { fontSize: 11, color: "#475569" } }, "· " + tipoInfo.duracion) : null
+        ),
+        React.createElement("div", { style: { fontSize: 19, fontWeight: 800, color: "#e8f4f8" } }, tour.cliente),
+        React.createElement("div", { style: { fontSize: 13, color: "#7ec8e3", marginTop: 3 } }, paxText + " · " + tour.guiaNombre + " · " + tour.metodoPago),
+        (tour.hora || tour.puntoEncuentro) ? React.createElement("div", { style: { fontSize: 12, color: "#94a3b8", marginTop: 4 } },
+          [tour.hora ? "🕐 " + tour.hora : "", tour.puntoEncuentro ? "📍 " + tour.puntoEncuentro : ""].filter(Boolean).join("  ·  ")
+        ) : null,
+        tour.contactoCliente ? React.createElement("div", { style: { fontSize: 12, color: "#94a3b8", marginTop: 2 } }, "📞 " + tour.contactoCliente) : null,
+        React.createElement("div", { style: { marginTop: 6 } },
+          React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: ESTADO_PAGO_COLOR[tour.estadoPago || "Pendiente"], background: ESTADO_PAGO_COLOR[tour.estadoPago || "Pendiente"] + "20", border: "1px solid " + ESTADO_PAGO_COLOR[tour.estadoPago || "Pendiente"] + "50", borderRadius: 6, padding: "3px 8px" } }, "💵 " + (tour.estadoPago || "Pendiente"))
+        )
+      ),
+      React.createElement("button", { onClick: onClose, style: { background: "transparent", border: "none", color: "#475569", fontSize: 22, cursor: "pointer" } }, "✕")
+    ),
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 } },
+      ...[ ["💰 Ingreso",fmt(tour.ingreso),"#7ec8e3"], ["📦 Gastos",fmt(tour.gastoTotal),"#f59e0b"], ["📈 Ganancia",fmt(tour.ganancia),tour.ganancia>=0?"#4ade80":"#f87171"] ]
+        .map(([l,v,c]) => React.createElement("div", { key: l, style: { background: "#0a1e2a", borderRadius: 10, padding: "12px 8px", textAlign: "center" } },
+          React.createElement("div", { style: { fontSize: 10, color: "#475569", marginBottom: 4 } }, l),
+          React.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: c } }, v)
+        ))
+    ),
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 } },
+      ...[ ["Precio/Pax", fmt(tour.precioPax)], ["Comisión ("+tour.comisionPct+"%)", fmt(tour.comisionUSD)] ]
+        .map(([l,v]) => React.createElement("div", { key: l, style: { background: "#0f2027", borderRadius: 8, padding: "10px 12px" } },
+          React.createElement("div", { style: { fontSize: 10, color: "#475569", marginBottom: 3 } }, l),
+          React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "#cbd5e1" } }, v)
+        ))
+    ),
+    tour.notas ? React.createElement("div", { style: { marginBottom: 16, background: "#1a140a", border: "1px solid #78350f", borderRadius: 10, padding: "12px 14px" } },
+      React.createElement("div", { style: { fontSize: 11, color: "#f59e0b", fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 } }, "⚠️ Notas para el guía"),
+      React.createElement("div", { style: { fontSize: 13, color: "#e8f4f8", whiteSpace: "pre-line" } }, tour.notas)
+    ) : null,
+    React.createElement("div", { style: { marginBottom: 16 } },
+      React.createElement("div", { style: { fontSize: 11, color: "#475569", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 } }, "Desglose de Gastos"),
+      React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5 } },
+        ...[ ["🧑‍✈️ Guía", tour.pagoGuia ?? tour.guia], ...(TIPOS_TOUR[tour.tipo]?.gastos || COLS_GASTOS).map(k => [COLS_LABEL[k], tour[k]]) ]
+          .map(([l,v]) => {
+            const val = Number(v) || 0;
+            return React.createElement("div", { key: l, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#0a1e2a", borderRadius: 8, opacity: val > 0 ? 1 : 0.3 } },
+              React.createElement("span", { style: { fontSize: 13, color: "#cbd5e1" } }, l),
+              React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: val > 0 ? "#f59e0b" : "#334155" } }, fmt(val))
+            );
+          })
+      )
+    ),
+    React.createElement("button", { onClick: () => compartirWhatsApp(tour), style: { width: "100%", background: "#0d3320", border: "1px solid #25D366", color: "#25D366", borderRadius: 8, padding: 11, cursor: "pointer", fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "📲 Enviar al guía por WhatsApp"),
+    React.createElement("div", { style: { display: "flex", gap: 10 } },
+      React.createElement("button", { onClick: () => onEdit(tour), style: { flex: 1, background: "transparent", border: "1px solid #0ea5e9", color: "#7ec8e3", borderRadius: 8, padding: 10, cursor: "pointer", fontSize: 13 } }, "✏️ Editar"),
+      React.createElement("button", { onClick: () => { if (confirm("¿Eliminar este tour? Esta acción no se puede deshacer.")) { onDelete(tour.id); onClose(); } }, style: { flex: 1, background: "transparent", border: "1px solid #7f1d1d", color: "#f87171", borderRadius: 8, padding: 10, cursor: "pointer", fontSize: 13 } }, "🗑 Eliminar")
+    )
+  );
+}
+
+// ── LISTA DEL DÍA (cuando hay 2+ tours el mismo día) ────────────────────────────
+function DayList({ tours, onSelect, onAdd, onClose }) {
+  return React.createElement("div", { style: { padding: 20 } },
+    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } },
+      React.createElement("p", { style: { color: "#7ec8e3", fontWeight: 700, fontSize: 13, letterSpacing: 1, textTransform: "uppercase" } }, "Tours del día"),
+      React.createElement("button", { onClick: onClose, style: { background: "transparent", border: "none", color: "#475569", fontSize: 22, cursor: "pointer" } }, "✕")
+    ),
+    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 } },
+      ...tours.map(t => {
+        const ti = TIPOS_TOUR[t.tipo] || TIPOS_TOUR.personalizado;
+        return React.createElement("div", { key: t.id, onClick: () => onSelect(t), style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 10, padding: "12px 14px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" } },
+          React.createElement("div", null,
+            React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#e8f4f8" } }, ti.label + " · " + t.cliente),
+            React.createElement("div", { style: { fontSize: 11, color: "#7ec8e3", marginTop: 2 } }, t.guiaNombre)
+          ),
+          React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: t.ganancia >= 0 ? "#4ade80" : "#f87171" } }, fmt(t.ganancia))
+        );
+      })
+    ),
+    React.createElement("button", { onClick: onAdd, style: { width: "100%", background: "linear-gradient(135deg,#0ea5e9,#0369a1)", color: "#fff", border: "none", borderRadius: 8, padding: 12, fontWeight: 700, cursor: "pointer", fontSize: 14 } }, "+ Agregar otro tour")
+  );
+}
+
+// ── LEADS (referidos de property management) ────────────────────────────────
+const PROPERTY_MANAGERS = ["Casas del Caribe"];
+const IDIOMAS = ["Español", "Inglés", "Portugués", "Francés"];
+const LEAD_ESTADOS = ["Pendiente", "Contactado", "Confirmado", "Convertido", "Perdido"];
+const LEAD_ESTADO_COLOR = { Pendiente: "#f59e0b", Contactado: "#0ea5e9", Confirmado: "#4ade80", Convertido: "#7ec8e3", Perdido: "#f87171" };
+
+function LeadForm({ onSave, onCancel, leadToEdit, onConvert, onDelete }) {
+  const [pm, setPm] = React.useState(() => leadToEdit ? (PROPERTY_MANAGERS.includes(leadToEdit.propertyManagement) ? leadToEdit.propertyManagement : "__new") : "Casas del Caribe");
+  const [idioma, setIdioma] = React.useState(() => leadToEdit ? (IDIOMAS.includes(leadToEdit.idioma) ? leadToEdit.idioma : (leadToEdit.idioma ? "__new" : "Español")) : "Español");
+  const [f, setF] = React.useState(() => leadToEdit ? {
+    propertyManagement: leadToEdit.propertyManagement, huesped: leadToEdit.huesped, unidad: leadToEdit.unidad || "",
+    tourInteres: leadToEdit.tourInteres || "", pax: leadToEdit.pax || "", fecha: leadToEdit.fecha || "",
+    contacto: leadToEdit.contacto || "", notas: leadToEdit.notas || "", estado: leadToEdit.estado || "Pendiente",
+    edades: leadToEdit.edades || "", alergias: leadToEdit.alergias || "", preferencias: leadToEdit.preferencias || "",
+  } : {
+    propertyManagement: "Casas del Caribe", huesped: "", unidad: "",
+    tourInteres: "", pax: "", fecha: new Date().toISOString().split("T")[0],
+    contacto: "", notas: "", estado: "Pendiente",
+    edades: "", alergias: "", preferencias: "",
+  });
+  const h = (k, v) => setF(p => ({ ...p, [k]: v }));
+
+  const inp = { width: "100%", background: "#0f2027", border: "1px solid #2d5a80", borderRadius: 6, padding: "8px 10px", color: "#e8f4f8", fontSize: 13, boxSizing: "border-box" };
+  const lbl = { fontSize: 11, color: "#7ec8e3", display: "block", marginBottom: 3 };
+
+  function save() {
+    if (!f.huesped || !f.fecha) return;
+    const propertyManagement = pm === "__new" ? (document.getElementById("pm-custom-input")?.value.trim() || "Otro") : pm;
+    const idiomaFinal = idioma === "__new" ? (document.getElementById("idioma-custom-input")?.value.trim() || "Otro") : idioma;
+    onSave({ ...f, propertyManagement, idioma: idiomaFinal, id: leadToEdit ? leadToEdit.id : Date.now(), pax: Number(f.pax) || 0 });
+  }
+
+  return React.createElement("div", { style: { padding: 20 } },
+    React.createElement("p", { style: { color: "#7ec8e3", fontWeight: 700, marginBottom: 14, fontSize: 13, letterSpacing: 1, textTransform: "uppercase" } }, leadToEdit ? "✏️ Editar Lead" : "+ Nuevo Lead"),
+    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 14, marginBottom: 16 } },
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Property Management"),
+        React.createElement("select", { value: pm, onChange: e => setPm(e.target.value), style: inp },
+          ...PROPERTY_MANAGERS.map(p => React.createElement("option", { key: p }, p)),
+          React.createElement("option", { value: "__new" }, "+ Otro")
+        ),
+        pm === "__new" ? React.createElement("input", { id: "pm-custom-input", type: "text", placeholder: "Nombre del property management", defaultValue: leadToEdit && pm === "__new" ? leadToEdit.propertyManagement : "", style: { ...inp, marginTop: 8 } }) : null
+      ),
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Huésped / Grupo"),
+        React.createElement("input", { type: "text", value: f.huesped, onChange: e => h("huesped", e.target.value), style: inp, placeholder: "Nombre del huésped" })
+      ),
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Villa / Unidad (opcional)"),
+        React.createElement("input", { type: "text", value: f.unidad, onChange: e => h("unidad", e.target.value), style: inp, placeholder: "Ej: Villa 4" })
+      ),
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Fecha tentativa"),
+        React.createElement("input", { type: "date", value: f.fecha, onChange: e => h("fecha", e.target.value), style: inp })
+      )
+    ),
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 16, marginBottom: 16 } },
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Tour de interés"),
+        React.createElement("select", { value: f.tourInteres, onChange: e => h("tourInteres", e.target.value), style: inp },
+          React.createElement("option", { value: "" }, "Sin definir"),
+          ...Object.entries(TIPOS_TOUR).map(([key, t]) => React.createElement("option", { key, value: key }, t.label))
+        )
+      ),
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "# Pax estimado"),
+        React.createElement("input", { type: "number", value: f.pax, onChange: e => h("pax", e.target.value), style: inp })
+      )
+    ),
+    React.createElement("div", { style: { marginBottom: 16 } },
+      React.createElement("label", { style: lbl }, "Contacto del PM (WhatsApp / Email)"),
+      React.createElement("input", { type: "text", value: f.contacto, onChange: e => h("contacto", e.target.value), style: inp, placeholder: "El PM es el intermediario, no tienes el del cliente" })
+    ),
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 16, marginBottom: 16 } },
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Idioma"),
+        React.createElement("select", { value: idioma, onChange: e => setIdioma(e.target.value), style: inp },
+          ...IDIOMAS.map(i => React.createElement("option", { key: i }, i)),
+          React.createElement("option", { value: "__new" }, "+ Otro")
+        ),
+        idioma === "__new" ? React.createElement("input", { id: "idioma-custom-input", type: "text", placeholder: "Idioma", defaultValue: leadToEdit && idioma === "__new" ? leadToEdit.idioma : "", style: { ...inp, marginTop: 8 } }) : null
+      ),
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Edades del grupo"),
+        React.createElement("input", { type: "text", value: f.edades, onChange: e => h("edades", e.target.value), style: inp, placeholder: "Ej: 2 adultos, niño 8 años" })
+      )
+    ),
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 16, marginBottom: 16 } },
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "🚨 Alergias"),
+        React.createElement("input", { type: "text", value: f.alergias, onChange: e => h("alergias", e.target.value), style: { ...inp, border: f.alergias ? "1px solid #f59e0b" : inp.border }, placeholder: "Ninguna conocida" })
+      ),
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Preferencias alimenticias"),
+        React.createElement("input", { type: "text", value: f.preferencias, onChange: e => h("preferencias", e.target.value), style: inp, placeholder: "Vegetariano, sin gluten, etc." })
+      )
+    ),
+    leadToEdit ? React.createElement("div", { style: { marginBottom: 16 } },
+      React.createElement("label", { style: lbl }, "Estado"),
+      React.createElement("select", { value: f.estado, onChange: e => h("estado", e.target.value), style: inp },
+        ...LEAD_ESTADOS.map(e => React.createElement("option", { key: e }, e))
+      )
+    ) : null,
+    React.createElement("div", { style: { marginBottom: 16 } },
+      React.createElement("label", { style: lbl }, "Notas"),
+      React.createElement("textarea", { value: f.notas, onChange: e => h("notas", e.target.value), style: { ...inp, minHeight: 70, resize: "vertical" }, placeholder: "Horario preferido, alergias, idioma, etc." })
+    ),
+    React.createElement("div", { style: { display: "flex", gap: 10 } },
+      React.createElement("button", { onClick: save, style: { flex: 1, background: "linear-gradient(135deg,#0ea5e9,#0369a1)", color: "#fff", border: "none", borderRadius: 8, padding: 12, fontWeight: 700, cursor: "pointer", fontSize: 14 } }, leadToEdit ? "Guardar Cambios" : "Guardar Lead"),
+      React.createElement("button", { onClick: onCancel, style: { flex: 1, background: "transparent", color: "#7ec8e3", border: "1px solid #1e4060", borderRadius: 8, padding: 12, cursor: "pointer", fontSize: 14 } }, "Cancelar")
+    ),
+    leadToEdit ? React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 10 } },
+      React.createElement("button", { onClick: () => onConvert(leadToEdit), style: { flex: 1, background: "transparent", border: "1px solid #4ade80", color: "#4ade80", borderRadius: 8, padding: 10, cursor: "pointer", fontSize: 13 } }, "🌊 Convertir a Tour"),
+      React.createElement("button", { onClick: () => { if (confirm("¿Eliminar este lead?")) onDelete(leadToEdit.id); }, style: { flex: 1, background: "transparent", border: "1px solid #7f1d1d", color: "#f87171", borderRadius: 8, padding: 10, cursor: "pointer", fontSize: 13 } }, "🗑 Eliminar")
+    ) : null
+  );
+}
+
+function LeadsView({ leads, onAdd, onOpen, onClose, onSync }) {
+  const [syncing, setSyncing] = React.useState(false);
+  const [msg, setMsg] = React.useState("");
+  const ordenados = [...leads].sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
+
+  async function sincronizar() {
+    setSyncing(true); setMsg("");
+    try {
+      const remotos = await traerLeadsDeSheets();
+      const nuevos = onSync(remotos);
+      setMsg(nuevos > 0 ? "✅ " + nuevos + " lead" + (nuevos > 1 ? "s" : "") + " nuevo" + (nuevos > 1 ? "s" : "") : "Sin leads nuevos");
+    } catch (e) {
+      setMsg("⚠️ No se pudo actualizar. Verifica que el Apps Script esté actualizado (paso pendiente).");
+    }
+    setSyncing(false);
+  }
+
+  return React.createElement("div", { style: { padding: 20 } },
+    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } },
+      React.createElement("p", { style: { color: "#7ec8e3", fontWeight: 700, fontSize: 13, letterSpacing: 1, textTransform: "uppercase" } }, "Leads de Property Managers"),
+      React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center" } },
+        React.createElement("button", { onClick: sincronizar, disabled: syncing, style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 8, padding: "6px 10px", color: "#7ec8e3", fontSize: 12, fontWeight: 700, cursor: "pointer" } }, syncing ? "⏳" : "🔄 Actualizar"),
+        React.createElement("button", { onClick: onClose, style: { background: "transparent", border: "none", color: "#475569", fontSize: 22, cursor: "pointer" } }, "✕")
+      )
+    ),
+    msg ? React.createElement("div", { style: { fontSize: 12, color: "#94a3b8", marginBottom: 10 } }, msg) : null,
+    ordenados.length === 0 ? React.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: "#475569", fontSize: 13 } }, "Aún no tienes leads registrados.") : null,
+    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 } },
+      ...ordenados.map(l => React.createElement("div", { key: l.id, onClick: () => onOpen(l), style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 10, padding: "12px 14px", cursor: "pointer" } },
+        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 } },
+          React.createElement("div", null,
+            React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#e8f4f8" } }, l.huesped || "(sin nombre)"),
+            React.createElement("div", { style: { fontSize: 11, color: "#7ec8e3", marginTop: 2 } }, l.propertyManagement + (l.unidad ? " · " + l.unidad : "")),
+            React.createElement("div", { style: { fontSize: 11, color: "#475569", marginTop: 2 } }, (l.fecha || "—") + (l.tourInteres ? " · " + (TIPOS_TOUR[l.tourInteres]?.label || l.tourInteres) : "")),
+            l.alergias ? React.createElement("div", { style: { fontSize: 11, color: "#f59e0b", marginTop: 3, fontWeight: 600 } }, "🚨 " + l.alergias) : null
+          ),
+          React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: LEAD_ESTADO_COLOR[l.estado] || "#7ec8e3", background: (LEAD_ESTADO_COLOR[l.estado] || "#7ec8e3") + "20", border: "1px solid " + (LEAD_ESTADO_COLOR[l.estado] || "#7ec8e3") + "50", borderRadius: 6, padding: "3px 7px", whiteSpace: "nowrap" } }, l.estado)
+        )
+      ))
+    ),
+    React.createElement("button", { onClick: onAdd, style: { width: "100%", background: "linear-gradient(135deg,#0ea5e9,#0369a1)", color: "#fff", border: "none", borderRadius: 8, padding: 12, fontWeight: 700, cursor: "pointer", fontSize: 14 } }, "+ Nuevo Lead")
+  );
+}
+
+// ── AJUSTES / RESPALDO ───────────────────────────────────────────────────────
+function AjustesView({ meses, onClose }) {
+  const fileRef = React.useRef(null);
+  const pendientes = Object.values(meses).flatMap(m => m.tours).filter(t => (t.estadoPago || "Pendiente") !== "Pagado");
+  const totalPendiente = pendientes.reduce((a, t) => a + t.ingreso, 0);
+
+  return React.createElement("div", { style: { padding: 20 } },
+    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 } },
+      React.createElement("p", { style: { color: "#7ec8e3", fontWeight: 700, fontSize: 13, letterSpacing: 1, textTransform: "uppercase" } }, "⚙️ Ajustes"),
+      React.createElement("button", { onClick: onClose, style: { background: "transparent", border: "none", color: "#475569", fontSize: 22, cursor: "pointer" } }, "✕")
+    ),
+    pendientes.length > 0 ? React.createElement("div", { style: { background: "#1a140a", border: "1px solid #78350f", borderRadius: 10, padding: "12px 14px", marginBottom: 16 } },
+      React.createElement("div", { style: { fontSize: 11, color: "#f59e0b", fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 } }, "💵 Cobros pendientes"),
+      React.createElement("div", { style: { fontSize: 13, color: "#e8f4f8", marginBottom: 8 } }, pendientes.length + " tour" + (pendientes.length > 1 ? "s" : "") + " sin pago completo · " + fmt(totalPendiente)),
+      ...pendientes.slice(0, 6).map(t => React.createElement("div", { key: t.id, style: { fontSize: 12, color: "#cbd5e1", padding: "4px 0", borderTop: "1px solid #78350f40", display: "flex", justifyContent: "space-between" } },
+        React.createElement("span", null, t.fecha + " · " + t.cliente),
+        React.createElement("span", { style: { color: ESTADO_PAGO_COLOR[t.estadoPago || "Pendiente"], fontWeight: 700 } }, fmt(t.ingreso))
+      ))
+    ) : React.createElement("div", { style: { background: "#0d3320", border: "1px solid #25D36650", borderRadius: 10, padding: "12px 14px", marginBottom: 16, fontSize: 13, color: "#4ade80" } }, "✅ Todos los tours están pagados"),
+    React.createElement("div", { style: { fontSize: 11, color: "#475569", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 } }, "Respaldo de datos"),
+    React.createElement("p", { style: { fontSize: 12, color: "#94a3b8", marginBottom: 12, lineHeight: 1.5 } }, "Tus datos viven solo en este dispositivo. Guarda un respaldo de vez en cuando (se descarga un archivo) y guárdalo en iCloud, Drive o donde prefieras."),
+    React.createElement("button", { onClick: exportarRespaldo, style: { width: "100%", background: "linear-gradient(135deg,#0ea5e9,#0369a1)", color: "#fff", border: "none", borderRadius: 8, padding: 12, fontWeight: 700, cursor: "pointer", fontSize: 14, marginBottom: 10 } }, "⬇ Descargar respaldo"),
+    React.createElement("button", { onClick: () => fileRef.current?.click(), style: { width: "100%", background: "transparent", border: "1px solid #1e4060", color: "#7ec8e3", borderRadius: 8, padding: 12, cursor: "pointer", fontSize: 14 } }, "⬆ Restaurar desde respaldo"),
+    React.createElement("input", { ref: fileRef, type: "file", accept: ".json,application/json", style: { display: "none" }, onChange: e => { const file = e.target.files[0]; if (file) importarRespaldo(file, () => location.reload()); e.target.value = ""; } })
+  );
+}
+
+// ── APP ───────────────────────────────────────────────────────────────────────
+function App() {
+  const [meses, setMeses] = React.useState(() => {
+    try { const s = localStorage.getItem("chamorro_tours_data"); return s ? JSON.parse(s) : MESES_INIT; } catch { return MESES_INIT; }
+  });
+  const [mesActivo, setMesActivo] = React.useState(() => {
+    const d = new Date();
+    const key = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+    return meses[key] ? key : Object.keys(meses)[0];
+  });
+  const [panel, setPanel] = React.useState(null);
+  const [leads, setLeads] = React.useState(() => {
+    try { const s = localStorage.getItem("chamorro_leads_data"); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
+
+  const { year, month, label, tours } = meses[mesActivo];
+  const cells = getDiasCalendario(year, month);
+
+  const toursPorDia = useMemo(() => {
+    const map = {};
+    tours.forEach(t => {
+      const [ty,tm,td] = t.fecha.split("-").map(Number);
+      if (ty === year && tm === month) { if (!map[td]) map[td] = []; map[td].push(t); }
+    });
+    return map;
+  }, [tours, year, month]);
+
+  const totales = useMemo(() => tours.reduce((a,t) => ({ ingreso: a.ingreso+t.ingreso, gastoTotal: a.gastoTotal+t.gastoTotal, ganancia: a.ganancia+t.ganancia, pax: a.pax+t.pax }), { ingreso:0, gastoTotal:0, ganancia:0, pax:0 }), [tours]);
+
+  function save(key, updated) { localStorage.setItem("chamorro_tours_data", JSON.stringify(updated)); return updated; }
+  function mesKeyDeFecha(fecha) { const [y, m] = (fecha || "").split("-"); return y && m ? y + "-" + m : null; }
+  function addTour(tour) {
+    const k = mesKeyDeFecha(tour.fecha);
+    const key = (k && meses[k]) ? k : mesActivo;
+    setMeses(p => save(key, { ...p, [key]: { ...p[key], tours: [...p[key].tours, tour] } }));
+    syncTourASheets(tour); setPanel(null);
+  }
+  function updateTour(tour) { setMeses(p => save(mesActivo, { ...p, [mesActivo]: { ...p[mesActivo], tours: p[mesActivo].tours.map(t => t.id === tour.id ? tour : t) } })); syncTourASheets(tour); setPanel(null); }
+  function deleteTour(id) { setMeses(p => save(mesActivo, { ...p, [mesActivo]: { ...p[mesActivo], tours: p[mesActivo].tours.filter(t => t.id !== id) } })); }
+
+  function saveLeads(updated) { localStorage.setItem("chamorro_leads_data", JSON.stringify(updated)); return updated; }
+  function mergeLeadsRemotos(remotos) {
+    let nuevos = 0;
+    setLeads(p => {
+      const ids = new Set(p.map(l => String(l.id)));
+      const aAgregar = remotos.filter(r => r && r.id && !ids.has(String(r.id)));
+      nuevos = aAgregar.length;
+      return aAgregar.length ? saveLeads([...p, ...aAgregar]) : p;
+    });
+    return nuevos;
+  }
+  function addLead(lead) { setLeads(p => saveLeads([...p, lead])); setPanel({ tipo: "leads" }); }
+  function updateLead(lead) { setLeads(p => saveLeads(p.map(l => l.id === lead.id ? lead : l))); setPanel({ tipo: "leads" }); }
+  function deleteLead(id) { setLeads(p => saveLeads(p.filter(l => l.id !== id))); setPanel({ tipo: "leads" }); }
+  function convertirLead(lead) {
+    setLeads(p => saveLeads(p.map(l => l.id === lead.id ? { ...l, estado: "Convertido" } : l)));
+    const k = mesKeyDeFecha(lead.fecha);
+    if (k && meses[k]) setMesActivo(k);
+    const notas = [
+      lead.idioma ? "🗣 Idioma: " + lead.idioma : "",
+      lead.edades ? "👥 Edades: " + lead.edades : "",
+      lead.alergias ? "🚨 Alergias: " + lead.alergias : "",
+      lead.preferencias ? "🍽 Preferencias: " + lead.preferencias : "",
+      lead.notas ? "📝 " + lead.notas : "",
+    ].filter(Boolean).join("\n");
+    setPanel({
+      tipo: "form",
+      dia: lead.fecha || (year + "-" + String(month).padStart(2, "0") + "-01"),
+      prefill: { cliente: lead.huesped + (lead.unidad ? " (" + lead.unidad + ")" : ""), pax: lead.pax || "", tipoKey: lead.tourInteres || "kayaking", notas }
+    });
+  }
+
+  const hoy = new Date();
+  const esHoy = d => hoy.getFullYear() === year && (hoy.getMonth()+1) === month && hoy.getDate() === d;
+  function clickDia(dia) {
+    const ts = toursPorDia[dia] || [];
+    const fechaStr = year+"-"+String(month).padStart(2,"0")+"-"+String(dia).padStart(2,"0");
+    if (ts.length === 0) setPanel({ tipo: "form", dia: fechaStr });
+    else if (ts.length === 1) setPanel({ tipo: "detalle", tour: ts[0] });
+    else setPanel({ tipo: "lista", dia: fechaStr, tours: ts });
+  }
+
+  const S = (style) => style;
+
+  return React.createElement("div", { style: { minHeight: "100vh", background: "#070f16", color: "#e8f4f8", display: "flex", flexDirection: "column" } },
+    // HEADER
+    React.createElement("div", { style: { background: "#0a1a24", borderBottom: "1px solid #1e3a4a", padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 } },
+      React.createElement("div", { style: { width: 38, height: 38, borderRadius: 9, background: "linear-gradient(135deg,#0ea5e9,#0369a1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 } }, "🌊"),
+      React.createElement("div", { style: { flex: 1 } },
+        React.createElement("div", { style: { fontWeight: 800, fontSize: 16 } }, "Chamorro Tours"),
+        React.createElement("div", { style: { fontSize: 11, color: "#475569" } }, "Control Mensual")
+      ),
+      React.createElement("div", { style: { display: "flex", gap: 8 } },
+        React.createElement("button", { onClick: () => setPanel({ tipo: "ajustes" }), style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 8, padding: "8px 12px", color: "#7ec8e3", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "⚙️"),
+        React.createElement("button", { onClick: () => setPanel({ tipo: "leads" }), style: { position: "relative", background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 8, padding: "8px 12px", color: "#7ec8e3", fontWeight: 700, fontSize: 13, cursor: "pointer" } },
+          "👥",
+          leads.filter(l => l.estado === "Pendiente").length > 0 ? React.createElement("span", { style: { position: "absolute", top: -5, right: -5, background: "#f59e0b", color: "#000", fontSize: 10, fontWeight: 800, borderRadius: 10, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" } }, leads.filter(l => l.estado === "Pendiente").length) : null
+        ),
+        React.createElement("button", { onClick: async e => { const btn = e.currentTarget; btn.disabled = true; const txt = btn.textContent; btn.textContent = "⏳..."; try { await exportarExcel(meses); } finally { btn.disabled = false; btn.textContent = txt; } }, style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 8, padding: "8px 12px", color: "#7ec8e3", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "⬇ Excel"),
+        React.createElement("button", { onClick: () => setPanel({ tipo: "form", dia: esHoy(hoy.getDate()) ? year+"-"+String(month).padStart(2,"0")+"-"+String(hoy.getDate()).padStart(2,"0") : year+"-"+String(month).padStart(2,"0")+"-01" }), style: { background: "linear-gradient(135deg,#0ea5e9,#0369a1)", border: "none", borderRadius: 8, padding: "8px 14px", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "+ Tour")
+      )
+    ),
+    // MESES
+    React.createElement("div", { style: { display: "flex", gap: 6, padding: "10px 16px", overflowX: "auto", background: "#0a1a24", borderBottom: "1px solid #1e3a4a" } },
+      ...Object.entries(meses).map(([key, { label: lb, tours: ts }]) =>
+        React.createElement("button", { key, onClick: () => setMesActivo(key), style: { flexShrink: 0, position: "relative", background: mesActivo === key ? "linear-gradient(135deg,#0ea5e9,#0369a1)" : "#0f2027", border: mesActivo === key ? "none" : "1px solid #1e3a4a", borderRadius: 7, padding: "7px 14px", color: mesActivo === key ? "#fff" : "#7ec8e3", fontSize: 12, fontWeight: mesActivo === key ? 700 : 400, cursor: "pointer" } },
+          lb.split(" ")[0],
+          ts.length > 0 ? React.createElement("span", { style: { position: "absolute", top: -3, right: -3, width: 7, height: 7, borderRadius: "50%", background: "#4ade80", border: "1.5px solid #070f16" } }) : null
+        )
+      )
+    ),
+    // KPIs
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, padding: "12px 16px" } },
+      ...[ ["Ingreso",fmt(totales.ingreso),"#7ec8e3"], ["Gastos",fmt(totales.gastoTotal),"#f59e0b"], ["Ganancia",fmt(totales.ganancia),totales.ganancia>=0?"#4ade80":"#f87171"], ["Pax",totales.pax||"—","#e8f4f8"] ]
+        .map(([l,v,c]) => React.createElement("div", { key: l, style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 10, padding: "10px 8px", textAlign: "center" } },
+          React.createElement("div", { style: { fontSize: 10, color: "#475569", marginBottom: 4 } }, l),
+          React.createElement("div", { style: { fontSize: 15, fontWeight: 800, color: c } }, v)
+        ))
+    ),
+    // CALENDARIO
+    React.createElement("div", { style: { flex: 1, padding: "0 16px 20px" } },
+      React.createElement("div", { style: { textAlign: "center", fontWeight: 800, fontSize: 16, color: "#e8f4f8", marginBottom: 10 } }, label),
+      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4, marginBottom: 4 } },
+        ...DIAS.map(d => React.createElement("div", { key: d, style: { textAlign: "center", fontSize: 11, color: "#334155", fontWeight: 700, padding: "4px 0" } }, d))
+      ),
+      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4 } },
+        ...cells.map((dia, i) => {
+          if (!dia) return React.createElement("div", { key: i });
+          const ts = toursPorDia[dia] || [];
+          const tieneTour = ts.length > 0;
+          const esFinDeSemana = i % 7 === 5 || i % 7 === 6;
+          const esDiaHoy = esHoy(dia);
+          return React.createElement("div", {
+            key: i, onClick: () => clickDia(dia),
+            style: { minHeight: 72, background: tieneTour ? "linear-gradient(145deg,#0c2d45,#0f3555)" : esDiaHoy ? "#0f2535" : "#0a1a24", border: tieneTour ? "1.5px solid #0ea5e9" : esDiaHoy ? "1.5px solid #334155" : "1px solid #12293a", borderRadius: 10, padding: "7px 6px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 3, position: "relative" }
+          },
+            React.createElement("div", { style: { fontSize: 13, fontWeight: esDiaHoy ? 800 : 600, color: esDiaHoy ? "#0ea5e9" : esFinDeSemana ? "#64748b" : "#94a3b8", lineHeight: 1 } }, dia),
+            ...ts.map(t => {
+              const ti = TIPOS_TOUR[t.tipo] || TIPOS_TOUR.personalizado;
+              return React.createElement("div", { key: t.id, style: { background: "linear-gradient(135deg,#0ea5e930,#0369a120)", border: "1px solid #0ea5e950", borderRadius: 5, padding: "3px 5px" } },
+                React.createElement("div", { style: { fontSize: 9, color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, ti.label),
+                React.createElement("div", { style: { fontSize: 10, color: "#4ade80", fontWeight: 700 } }, fmt(t.ganancia))
+              );
+            }),
+            esDiaHoy ? React.createElement("div", { style: { position: "absolute", bottom: 5, right: 5, width: 5, height: 5, borderRadius: "50%", background: "#0ea5e9" } }) : null
+          );
+        })
+      ),
+      React.createElement("div", { style: { display: "flex", gap: 16, marginTop: 14, justifyContent: "center" } },
+        ...[ ["#0ea5e9","Tour registrado"], ["#334155","Hoy"] ].map(([c,l]) =>
+          React.createElement("div", { key: l, style: { display: "flex", alignItems: "center", gap: 6 } },
+            React.createElement("div", { style: { width: 10, height: 10, borderRadius: 3, background: c } }),
+            React.createElement("span", { style: { fontSize: 11, color: "#475569" } }, l)
+          )
+        )
+      )
+    ),
+    // PANEL
+    panel ? React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "flex-end" } },
+      React.createElement("div", { style: { position: "absolute", inset: 0, background: "#000000aa" }, onClick: () => setPanel(null) }),
+      React.createElement("div", { style: { position: "relative", zIndex: 51, width: "100%", maxHeight: "90vh", background: "#0a1a24", borderTop: "1px solid #1e3a4a", borderRadius: "18px 18px 0 0", overflowY: "auto" } },
+        React.createElement("div", { style: { width: 36, height: 4, background: "#1e3a4a", borderRadius: 2, margin: "12px auto 4px" } }),
+        panel.tipo === "detalle" ? React.createElement(TourDetalle, { tour: panel.tour, onClose: () => setPanel(null), onDelete: deleteTour, onEdit: t => setPanel({ tipo: "form", dia: t.fecha, tour: t }) }) : null,
+        panel.tipo === "lista" ? React.createElement(DayList, { tours: panel.tours, onSelect: t => setPanel({ tipo: "detalle", tour: t }), onAdd: () => setPanel({ tipo: "form", dia: panel.dia }), onClose: () => setPanel(null) }) : null,
+        panel.tipo === "form" ? React.createElement(TourForm, { onSave: panel.tour ? updateTour : addTour, onCancel: () => setPanel(null), fechaInicial: panel.dia, tourToEdit: panel.tour, prefill: panel.prefill }) : null,
+        panel.tipo === "leads" ? React.createElement(LeadsView, { leads, onAdd: () => setPanel({ tipo: "leadForm" }), onOpen: l => setPanel({ tipo: "leadForm", lead: l }), onClose: () => setPanel(null), onSync: mergeLeadsRemotos }) : null,
+        panel.tipo === "leadForm" ? React.createElement(LeadForm, { onSave: panel.lead ? updateLead : addLead, onCancel: () => setPanel({ tipo: "leads" }), leadToEdit: panel.lead, onConvert: convertirLead, onDelete: deleteLead }) : null,
+        panel.tipo === "ajustes" ? React.createElement(AjustesView, { meses, onClose: () => setPanel(null) }) : null
+      )
+    ) : null,
+    React.createElement("style", null, "@keyframes slideUp { from { transform: translateY(100%); opacity:0 } to { transform: translateY(0); opacity:1 } }")
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+  </script>
+</body>
+</html>
