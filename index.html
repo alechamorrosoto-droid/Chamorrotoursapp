@@ -84,7 +84,7 @@ function importarRespaldo(file, onDone) {
       if (!data.tours && !data.leads) throw new Error("Formato no reconocido");
       if (!confirm("Esto reemplazará los datos actuales con el respaldo del " + (data.exportado ? data.exportado.split("T")[0] : "?") + ". ¿Continuar?")) return;
       if (data.tours) localStorage.setItem("chamorro_tours_data", JSON.stringify(data.tours));
-      if (data.leads) localStorage.setItem("chamorro_leads_data", JSON.stringify(data.leads));
+      if (data.leads) { localStorage.setItem("chamorro_leads_data", JSON.stringify(data.leads)); localStorage.removeItem("chamorro_leads_eliminados"); }
       onDone();
     } catch (err) { alert("No se pudo leer el respaldo: " + err.message); }
   };
@@ -112,6 +112,24 @@ function compartirWhatsApp(tour) {
   ].filter(Boolean);
   const url = "https://wa.me/?text=" + encodeURIComponent(lineas.join("\n"));
   window.open(url, "_blank");
+}
+
+const MESES_NOMBRES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+function crearMes(year, month) {
+  return { label: MESES_NOMBRES[month - 1] + " " + year, year, month, tours: [] };
+}
+function mesKeyDe(year, month) { return year + "-" + String(month).padStart(2, "0"); }
+// Garantiza que exista una pestaña de mes desde `atras` meses antes de hoy hasta `adelante` meses después,
+// sin borrar ni sobreescribir meses que ya tengan datos guardados.
+function asegurarRangoMeses(base, atras = 3, adelante = 12) {
+  let out = { ...base };
+  const hoy = new Date();
+  for (let i = -atras; i <= adelante; i++) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1);
+    const key = mesKeyDe(d.getFullYear(), d.getMonth() + 1);
+    if (!out[key]) out[key] = crearMes(d.getFullYear(), d.getMonth() + 1);
+  }
+  return out;
 }
 
 const MESES_INIT = {
@@ -264,8 +282,8 @@ function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill }) {
   const { ingreso, comisionUSD, gastoTotal, ganancia, paxTotal } = calcTour(f, tipoKey);
 
   function save() {
-    if (tipo.esAtv) { if (!f.fecha || !f.cliente || (!f.paxCompartido && !f.paxSolo)) return; }
-    else { if (!f.fecha || !f.cliente || !f.pax || !f.precioPax) return; }
+    if (tipo.esAtv) { if (!f.fecha || !f.cliente || (Number(f.paxCompartido) <= 0 && Number(f.paxSolo) <= 0)) return; }
+    else { if (!f.fecha || !f.cliente || !(Number(f.pax) > 0) || !(Number(f.precioPax) > 0)) return; }
     onSave({ ...f, id: tourToEdit ? tourToEdit.id : Date.now(), tipo: tipoKey, pax: paxTotal,
       paxCompartido: Number(f.paxCompartido)||0, paxSolo: Number(f.paxSolo)||0,
       precioPax: Number(f.precioPax), precioSolo: Number(f.precioSolo)||0,
@@ -666,7 +684,9 @@ function AjustesView({ meses, onClose }) {
 // ── APP ───────────────────────────────────────────────────────────────────────
 function App() {
   const [meses, setMeses] = React.useState(() => {
-    try { const s = localStorage.getItem("chamorro_tours_data"); return s ? JSON.parse(s) : MESES_INIT; } catch { return MESES_INIT; }
+    let base;
+    try { const s = localStorage.getItem("chamorro_tours_data"); base = s ? JSON.parse(s) : MESES_INIT; } catch { base = MESES_INIT; }
+    return asegurarRangoMeses(base);
   });
   const [mesActivo, setMesActivo] = React.useState(() => {
     const d = new Date();
@@ -696,19 +716,51 @@ function App() {
   function mesKeyDeFecha(fecha) { const [y, m] = (fecha || "").split("-"); return y && m ? y + "-" + m : null; }
   function addTour(tour) {
     const k = mesKeyDeFecha(tour.fecha);
-    const key = (k && meses[k]) ? k : mesActivo;
-    setMeses(p => save(key, { ...p, [key]: { ...p[key], tours: [...p[key].tours, tour] } }));
+    setMeses(p => {
+      let base = p;
+      if (k && !base[k]) { const [y, m] = k.split("-").map(Number); base = { ...base, [k]: crearMes(y, m) }; }
+      const key = (k && base[k]) ? k : mesActivo;
+      return save(key, { ...base, [key]: { ...base[key], tours: [...base[key].tours, tour] } });
+    });
     syncTourASheets(tour); setPanel(null);
   }
-  function updateTour(tour) { setMeses(p => save(mesActivo, { ...p, [mesActivo]: { ...p[mesActivo], tours: p[mesActivo].tours.map(t => t.id === tour.id ? tour : t) } })); syncTourASheets(tour); setPanel(null); }
+  function updateTour(tour) {
+    const keyDestino = mesKeyDeFecha(tour.fecha);
+    setMeses(p => {
+      let base = p;
+      if (keyDestino && !base[keyDestino]) { const [y, m] = keyDestino.split("-").map(Number); base = { ...base, [keyDestino]: crearMes(y, m) }; }
+      const keyValido = (keyDestino && base[keyDestino]) ? keyDestino : mesActivo;
+      let actualizado;
+      if (keyValido === mesActivo) {
+        actualizado = { ...base, [mesActivo]: { ...base[mesActivo], tours: base[mesActivo].tours.map(t => t.id === tour.id ? tour : t) } };
+      } else {
+        actualizado = {
+          ...base,
+          [mesActivo]: { ...base[mesActivo], tours: base[mesActivo].tours.filter(t => t.id !== tour.id) },
+          [keyValido]: { ...base[keyValido], tours: [...base[keyValido].tours, tour] },
+        };
+      }
+      return save(keyValido, actualizado);
+    });
+    syncTourASheets(tour); setPanel(null);
+  }
   function deleteTour(id) { setMeses(p => save(mesActivo, { ...p, [mesActivo]: { ...p[mesActivo], tours: p[mesActivo].tours.filter(t => t.id !== id) } })); }
 
   function saveLeads(updated) { localStorage.setItem("chamorro_leads_data", JSON.stringify(updated)); return updated; }
+  function getEliminados() {
+    try { return new Set(JSON.parse(localStorage.getItem("chamorro_leads_eliminados") || "[]").map(String)); } catch { return new Set(); }
+  }
+  function addEliminado(id) {
+    const set = getEliminados();
+    set.add(String(id));
+    localStorage.setItem("chamorro_leads_eliminados", JSON.stringify([...set]));
+  }
   function mergeLeadsRemotos(remotos) {
     let nuevos = 0;
     setLeads(p => {
       const ids = new Set(p.map(l => String(l.id)));
-      const aAgregar = remotos.filter(r => r && r.id && !ids.has(String(r.id)));
+      const eliminados = getEliminados();
+      const aAgregar = remotos.filter(r => r && r.id && !ids.has(String(r.id)) && !eliminados.has(String(r.id)));
       nuevos = aAgregar.length;
       return aAgregar.length ? saveLeads([...p, ...aAgregar]) : p;
     });
@@ -716,7 +768,7 @@ function App() {
   }
   function addLead(lead) { setLeads(p => saveLeads([...p, lead])); setPanel({ tipo: "leads" }); }
   function updateLead(lead) { setLeads(p => saveLeads(p.map(l => l.id === lead.id ? lead : l))); setPanel({ tipo: "leads" }); }
-  function deleteLead(id) { setLeads(p => saveLeads(p.filter(l => l.id !== id))); setPanel({ tipo: "leads" }); }
+  function deleteLead(id) { addEliminado(id); setLeads(p => saveLeads(p.filter(l => l.id !== id))); setPanel({ tipo: "leads" }); }
   function convertirLead(lead) {
     setLeads(p => saveLeads(p.map(l => l.id === lead.id ? { ...l, estado: "Convertido" } : l)));
     const k = mesKeyDeFecha(lead.fecha);
@@ -767,7 +819,7 @@ function App() {
     ),
     // MESES
     React.createElement("div", { style: { display: "flex", gap: 6, padding: "10px 16px", overflowX: "auto", background: "#0a1a24", borderBottom: "1px solid #1e3a4a" } },
-      ...Object.entries(meses).map(([key, { label: lb, tours: ts }]) =>
+      ...Object.entries(meses).sort(([a],[b]) => a.localeCompare(b)).map(([key, { label: lb, tours: ts }]) =>
         React.createElement("button", { key, onClick: () => setMesActivo(key), style: { flexShrink: 0, position: "relative", background: mesActivo === key ? "linear-gradient(135deg,#0ea5e9,#0369a1)" : "#0f2027", border: mesActivo === key ? "none" : "1px solid #1e3a4a", borderRadius: 7, padding: "7px 14px", color: mesActivo === key ? "#fff" : "#7ec8e3", fontSize: 12, fontWeight: mesActivo === key ? 700 : 400, cursor: "pointer" } },
           lb.split(" ")[0],
           ts.length > 0 ? React.createElement("span", { style: { position: "absolute", top: -3, right: -3, width: 7, height: 7, borderRadius: "50%", background: "#4ade80", border: "1.5px solid #070f16" } }) : null
