@@ -27,7 +27,7 @@ const TIPOS_TOUR = {
   dolphin:      { label: "🐬 Dolphin Tour",           precioPax: 120, duracion: "3 horas",   esAtv: false, gastos: ["fruta","transporte","otros"] },
   snorkeling:   { label: "🤿 Snorkeling",             precioPax: 90,  duracion: "2 horas",   esAtv: false, gastos: ["fruta","transporte","otros"] },
   chocolate:    { label: "🍫 Chocolate & Waterfalls", precioPax: 80,  duracion: "4-5 horas", esAtv: false, gastos: ["fruta","transporte","entradas","otros"] },
-  atv1:         { label: "🏍 ATV 1 Catarata",         precioPax: 140, precioSolo: 190, duracion: "5 horas", esAtv: true,  gastos: ["fruta","transporte","entradas","otros"] },
+  atv1:         { label: "🏍 ATV 1 Catarata + Chocolate",         precioPax: 140, precioSolo: 190, duracion: "5 horas", esAtv: true,  gastos: ["fruta","transporte","entradas","otros"] },
   atv2:         { label: "🏍 ATV 2 Cataratas",        precioPax: 120, precioSolo: 180, duracion: "5 horas", esAtv: true,  gastos: ["fruta","transporte","entradas","otros"] },
   personalizado:{ label: "✏️ Personalizado",           precioPax: 0,   duracion: "",          esAtv: false, gastos: ["fruta","transporte","kayaks","entradas","otros"] },
 };
@@ -48,6 +48,16 @@ function syncTourASheets(tour) {
       body: JSON.stringify({ ...tour, tipoLabel: TIPOS_TOUR[tour.tipo]?.label || tour.tipo })
     });
   } catch (err) { console.warn("No se pudo sincronizar con Sheets:", err); }
+}
+function syncTourEliminado(id) {
+  try {
+    fetch(SHEET_SYNC_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "eliminar_tour", id }),
+    });
+  } catch (err) { console.warn("No se pudo sincronizar eliminación de tour:", err); }
 }
 function syncLeadEliminado(id) {
   try {
@@ -280,7 +290,7 @@ async function exportarExcel(meses) {
 }
 
 // ── FORM ─────────────────────────────────────────────────────────────────────
-function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill }) {
+function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill, forcedId }) {
   const [tipoKey, setTipoKey] = React.useState(tourToEdit ? tourToEdit.tipo : (prefill?.tipoKey || "kayaking"));
   const tipo = TIPOS_TOUR[tipoKey];
   const [f, setF] = React.useState(() => tourToEdit ? {
@@ -312,7 +322,7 @@ function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill }) {
   function save() {
     if (tipo.esAtv) { if (!f.fecha || !f.cliente || (Number(f.paxCompartido) <= 0 && Number(f.paxSolo) <= 0)) return; }
     else { if (!f.fecha || !f.cliente || !(Number(f.pax) > 0) || !(Number(f.precioPax) > 0)) return; }
-    onSave({ ...f, id: tourToEdit ? tourToEdit.id : Date.now(), tipo: tipoKey, pax: paxTotal,
+    onSave({ ...f, id: tourToEdit ? tourToEdit.id : (forcedId || Date.now()), tipo: tipoKey, pax: paxTotal,
       paxCompartido: Number(f.paxCompartido)||0, paxSolo: Number(f.paxSolo)||0,
       precioPax: Number(f.precioPax), precioSolo: Number(f.precioSolo)||0,
       pagoGuia: Number(f.pagoGuia), fruta: Number(f.fruta), transporte: Number(f.transporte),
@@ -665,7 +675,8 @@ function LeadForm({ onSave, onCancel, leadToEdit, onConvert, onDelete }) {
     leadToEdit ? React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 10 } },
       React.createElement("button", { onClick: () => onConvert(leadToEdit), style: { flex: 1, background: "transparent", border: "1px solid #4ade80", color: "#4ade80", borderRadius: 8, padding: 10, cursor: "pointer", fontSize: 13 } }, "🌊 Convertir a Tour"),
       React.createElement("button", { onClick: () => { if (confirm("¿Eliminar este lead?")) onDelete(leadToEdit.id); }, style: { flex: 1, background: "transparent", border: "1px solid #7f1d1d", color: "#f87171", borderRadius: 8, padding: 10, cursor: "pointer", fontSize: 13 } }, "🗑 Eliminar")
-    ) : null
+    ) : null,
+    leadToEdit ? React.createElement("button", { onClick: () => compartirLinkCliente({ id: leadToEdit.id, cliente: leadToEdit.huesped }), style: { width: "100%", marginTop: 10, background: "#0a1e2a", border: "1px solid #0ea5e9", color: "#7ec8e3", borderRadius: 8, padding: 11, cursor: "pointer", fontSize: 13, fontWeight: 700 } }, "📩 Pedirle datos al cliente (vía PM)") : null
   );
 }
 
@@ -821,7 +832,7 @@ function App() {
     });
     syncTourASheets(tour); setPanel(null);
   }
-  function deleteTour(id) { setMeses(p => save(mesActivo, { ...p, [mesActivo]: { ...p[mesActivo], tours: p[mesActivo].tours.filter(t => t.id !== id) } })); }
+  function deleteTour(id) { setMeses(p => save(mesActivo, { ...p, [mesActivo]: { ...p[mesActivo], tours: p[mesActivo].tours.filter(t => t.id !== id) } })); syncTourEliminado(id); }
 
   function saveLeads(updated) { localStorage.setItem("chamorro_leads_data", JSON.stringify(updated)); return updated; }
   function getEliminados() {
@@ -911,7 +922,8 @@ function App() {
 
   return React.createElement("div", { style: { minHeight: "100vh", background: "#070f16", color: "#e8f4f8", display: "flex", flexDirection: "column" } },
     // HEADER
-    React.createElement("div", { style: { background: "#0a1a24", borderBottom: "1px solid #1e3a4a", padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 } },
+    React.createElement("div", { style: { background: "#0a1a24", borderBottom: "1px solid #1e3a4a" } },
+     React.createElement("div", { style: { padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, maxWidth: 640, margin: "0 auto", width: "100%" } },
       React.createElement("div", { style: { width: 38, height: 38, borderRadius: 9, background: "linear-gradient(135deg,#0ea5e9,#0369a1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 } }, "🌊"),
       React.createElement("div", { style: { flex: 1 } },
         React.createElement("div", { style: { fontWeight: 800, fontSize: 16 } }, "Chamorro Tours"),
@@ -926,9 +938,10 @@ function App() {
         React.createElement("button", { onClick: async e => { const btn = e.currentTarget; btn.disabled = true; const txt = btn.textContent; btn.textContent = "⏳..."; try { await exportarExcel(meses); } finally { btn.disabled = false; btn.textContent = txt; } }, style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 8, padding: "8px 12px", color: "#7ec8e3", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "⬇ Excel"),
         React.createElement("button", { onClick: () => setPanel({ tipo: "form", dia: esHoy(hoy.getDate()) ? year+"-"+String(month).padStart(2,"0")+"-"+String(hoy.getDate()).padStart(2,"0") : year+"-"+String(month).padStart(2,"0")+"-01" }), style: { background: "linear-gradient(135deg,#0ea5e9,#0369a1)", border: "none", borderRadius: 8, padding: "8px 14px", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "+ Tour")
       )
+     )
     ),
     // MESES
-    React.createElement("div", { style: { display: "flex", gap: 6, padding: "10px 16px", overflowX: "auto", background: "#0a1a24", borderBottom: "1px solid #1e3a4a" } },
+    React.createElement("div", { style: { display: "flex", gap: 6, padding: "10px 16px", overflowX: "auto", background: "#0a1a24", borderBottom: "1px solid #1e3a4a", maxWidth: 640, margin: "0 auto", width: "100%" } },
       ...Object.entries(meses).sort(([a],[b]) => a.localeCompare(b)).map(([key, { label: lb, tours: ts }]) =>
         React.createElement("button", { key, onClick: () => setMesActivo(key), style: { flexShrink: 0, position: "relative", background: mesActivo === key ? "linear-gradient(135deg,#0ea5e9,#0369a1)" : "#0f2027", border: mesActivo === key ? "none" : "1px solid #1e3a4a", borderRadius: 7, padding: "7px 14px", color: mesActivo === key ? "#fff" : "#7ec8e3", fontSize: 12, fontWeight: mesActivo === key ? 700 : 400, cursor: "pointer" } },
           lb.split(" ")[0],
@@ -937,12 +950,12 @@ function App() {
       )
     ),
     // KPIs
-    React.createElement("div", { style: { padding: "12px 16px 0" } },
+    React.createElement("div", { style: { padding: "12px 16px 0", maxWidth: 640, margin: "0 auto", width: "100%" } },
       React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 8 } },
         React.createElement("button", { onClick: () => setMostrarAnual(v => !v), style: { background: mostrarAnual ? "linear-gradient(135deg,#0ea5e9,#0369a1)" : "#0f2027", border: mostrarAnual ? "none" : "1px solid #1e3a4a", borderRadius: 7, padding: "5px 10px", color: mostrarAnual ? "#fff" : "#7ec8e3", fontSize: 11, fontWeight: 700, cursor: "pointer" } }, mostrarAnual ? "📅 Ver mes" : "📊 Ver total " + year)
       )
     ),
-    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, padding: "0 16px 12px" } },
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, padding: "0 16px 12px", maxWidth: 640, margin: "0 auto", width: "100%" } },
       ...(mostrarAnual
         ? [ ["Ingreso "+year,fmt(totalesAnio.ingreso),"#7ec8e3"], ["Gastos "+year,fmt(totalesAnio.gastoTotal),"#f59e0b"], ["Ganancia "+year,fmt(totalesAnio.ganancia),totalesAnio.ganancia>=0?"#4ade80":"#f87171"], ["Pax "+year,totalesAnio.pax||"—","#e8f4f8"] ]
         : [ ["Ingreso",fmt(totales.ingreso),"#7ec8e3"], ["Gastos",fmt(totales.gastoTotal),"#f59e0b"], ["Ganancia",fmt(totales.ganancia),totales.ganancia>=0?"#4ade80":"#f87171"], ["Pax",totales.pax||"—","#e8f4f8"] ]
@@ -952,7 +965,7 @@ function App() {
         ))
     ),
     // CALENDARIO
-    React.createElement("div", { style: { flex: 1, padding: "0 16px 20px" } },
+    React.createElement("div", { style: { flex: 1, padding: "0 16px 20px", maxWidth: 640, margin: "0 auto", width: "100%" } },
       React.createElement("div", { style: { textAlign: "center", fontWeight: 800, fontSize: 16, color: "#e8f4f8", marginBottom: 10 } }, label),
       React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4, marginBottom: 4 } },
         ...DIAS.map(d => React.createElement("div", { key: d, style: { textAlign: "center", fontSize: 11, color: "#334155", fontWeight: 700, padding: "4px 0" } }, d))
@@ -999,7 +1012,7 @@ function App() {
           onVerDetalleCliente: (d) => marcarDetalleVisto(clave(d)),
         }) : null,
         panel.tipo === "lista" ? React.createElement(DayList, { tours: panel.tours, onSelect: t => setPanel({ tipo: "detalle", tour: t }), onAdd: () => setPanel({ tipo: "form", dia: panel.dia }), onClose: () => setPanel(null) }) : null,
-        panel.tipo === "form" ? React.createElement(TourForm, { onSave: panel.tour ? updateTour : (t) => addTour(t, panel.leadId), onCancel: () => setPanel(null), fechaInicial: panel.dia, tourToEdit: panel.tour, prefill: panel.prefill }) : null,
+        panel.tipo === "form" ? React.createElement(TourForm, { onSave: panel.tour ? updateTour : (t) => addTour(t, panel.leadId), onCancel: () => setPanel(null), fechaInicial: panel.dia, tourToEdit: panel.tour, prefill: panel.prefill, forcedId: panel.leadId }) : null,
         panel.tipo === "leads" ? React.createElement(LeadsView, { leads, onAdd: () => setPanel({ tipo: "leadForm" }), onOpen: l => setPanel({ tipo: "leadForm", lead: l }), onClose: () => setPanel(null), onSync: mergeLeadsRemotos }) : null,
         panel.tipo === "leadForm" ? React.createElement(LeadForm, { onSave: panel.lead ? updateLead : addLead, onCancel: () => setPanel({ tipo: "leads" }), leadToEdit: panel.lead, onConvert: convertirLead, onDelete: deleteLead }) : null,
         panel.tipo === "ajustes" ? React.createElement(AjustesView, { meses, onClose: () => setPanel(null) }) : null
