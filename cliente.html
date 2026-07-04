@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -96,6 +96,7 @@
 
       <div class="card">
         <div id="info-tour" class="callout" style="display:none; line-height:1.8;"></div>
+        <div id="info-lead" class="callout" style="display:none; line-height:1.8;"></div>
         <div id="sin-id" class="callout rust" style="display:none;">This link seems to be missing some information. Please request a new link.</div>
 
         <div id="campos">
@@ -210,9 +211,54 @@ if (!tourId) {
   document.getElementById("sin-id").style.display = "block";
 } else {
   cargarInfoTour();
+  cargarInfoLead();
 }
 
 let tourInfoCache = null;
+
+async function cargarInfoLead() {
+  try {
+    const res = await fetch(SHEET_SYNC_URL + "?action=info_lead&id=" + encodeURIComponent(tourId), { method: "GET" });
+    if (!res.ok) return;
+    const lead = await res.json();
+    if (!lead) return;
+
+    // Prellenar campos editables para que el cliente confirme o corrija
+    if (lead.huesped && !v("huesped")) document.getElementById("huesped").value = lead.huesped;
+    if (lead.contacto && !v("contacto")) document.getElementById("contacto").value = lead.contacto;
+    if (lead.pax && !v("pax")) document.getElementById("pax").value = lead.pax;
+    if (lead.edades && !v("edades")) document.getElementById("edades").value = lead.edades;
+    if (lead.alergias && !v("alergias")) document.getElementById("alergias").value = lead.alergias;
+    if (lead.preferencias && !v("preferencias")) document.getElementById("preferencias").value = lead.preferencias;
+    if (lead.notas && !v("notas")) document.getElementById("notas").value = lead.notas;
+
+    const MAPA_IDIOMA = { "Español": "Español", "Inglés": "English", "Portugués": "Português", "Francés": "Français", "Otro": "Other" };
+    if (lead.idioma && MAPA_IDIOMA[lead.idioma]) {
+      document.getElementById("idioma").value = MAPA_IDIOMA[lead.idioma];
+    }
+
+    if (lead.tourInteres) {
+      const sel = document.getElementById("tour");
+      if ([...sel.options].some(o => o.value === lead.tourInteres)) {
+        sel.value = lead.tourInteres;
+        actualizarCamposCondicionales();
+        actualizarPrecioEstimado();
+        actualizarQueTraer();
+      }
+    }
+
+    const lineas = [];
+    lineas.push("<div class='eyebrow'>What we already have</div>");
+    if (lead.unidad) lineas.push("Unit: " + lead.unidad);
+    if (lead.fecha) lineas.push("Tentative date: " + lead.fecha);
+    lineas.push("Please review and update anything below if needed.");
+    if (lineas.length <= 1) return;
+
+    const box = document.getElementById("info-lead");
+    box.innerHTML = lineas.join("<br>");
+    box.style.display = "block";
+  } catch (e) { /* si falla, el formulario sigue funcionando igual */ }
+}
 
 async function cargarInfoTour() {
   try {
