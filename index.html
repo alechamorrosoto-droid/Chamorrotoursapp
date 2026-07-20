@@ -39,35 +39,31 @@ const ESTADO_PAGO_COLOR = { Pendiente: "#f87171", Parcial: "#f59e0b", Pagado: "#
 
 // ── SYNC CON GOOGLE SHEETS ───────────────────────────────────────────────────
 const SHEET_SYNC_URL = "https://script.google.com/macros/s/AKfycbxN_bxd5yxGWryQ-pMCqudxvN3vos4IibGqJsUofjbFVoRbJO0kw1gyoO2FNRWUYho49Q/exec";
+function syncConReintento(body, descripcion, intentos, intentoActual) {
+  intentos = intentos || 3;
+  intentoActual = intentoActual || 1;
+  fetch(SHEET_SYNC_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(body),
+  }).catch(err => {
+    console.warn("Fallo sincronizando (" + descripcion + "), intento " + intentoActual + ":", err);
+    if (intentoActual < intentos) {
+      setTimeout(() => syncConReintento(body, descripcion, intentos, intentoActual + 1), 1500 * intentoActual);
+    } else {
+      console.error("No se pudo sincronizar '" + descripcion + "' tras " + intentos + " intentos. Revisa tu conexión y vuelve a intentar la acción manualmente si es importante.");
+    }
+  });
+}
 function syncTourASheets(tour) {
-  try {
-    fetch(SHEET_SYNC_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ ...tour, tipoLabel: TIPOS_TOUR[tour.tipo]?.label || tour.tipo })
-    });
-  } catch (err) { console.warn("No se pudo sincronizar con Sheets:", err); }
+  syncConReintento({ ...tour, tipoLabel: TIPOS_TOUR[tour.tipo]?.label || tour.tipo }, "guardar tour");
 }
 function syncTourEliminado(id) {
-  try {
-    fetch(SHEET_SYNC_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: "eliminar_tour", id }),
-    });
-  } catch (err) { console.warn("No se pudo sincronizar eliminación de tour:", err); }
+  syncConReintento({ action: "eliminar_tour", id }, "eliminar tour");
 }
 function syncLeadEliminado(id) {
-  try {
-    fetch(SHEET_SYNC_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: "eliminar_lead", id }),
-    });
-  } catch (err) { console.warn("No se pudo sincronizar eliminación:", err); }
+  syncConReintento({ action: "eliminar_lead", id }, "eliminar lead");
 }
 async function traerLeadsDeSheets() {
   const res = await fetch(SHEET_SYNC_URL + "?action=leads", { method: "GET" });
@@ -144,10 +140,79 @@ function compartirWhatsApp(tour) {
 }
 
 function compartirLinkCliente(tour) {
-  const url = "https://chamorrotours.netlify.app/cliente.html?id=" + tour.id;
+  const url = "https://alechamorrosoto-droid.github.io/Chamorrotoursapp/cliente.html?id=" + tour.id + "&pm=" + encodeURIComponent(tour.propertyManagement || "Directo");
   const mensaje = "🌊 Hola! Para preparar todo bien para el tour de " + tour.cliente + ", ¿le puedes compartir este link al huésped para que complete unos datos rápidos (alergias, edades, etc.)?\n\n" + url;
   const waUrl = "https://wa.me/?text=" + encodeURIComponent(mensaje);
   window.open(waUrl, "_blank");
+}
+
+// ── CONFIRMACIÓN AL CLIENTE (ticket con QR) ─────────────────────────────────
+function enviarConfirmacionCliente(tour, detalleCliente) {
+  const ti = TIPOS_TOUR[tour.tipo] || TIPOS_TOUR.personalizado;
+  const params = new URLSearchParams({
+    tour: ti.label.replace(/^\S+\s/, ""),
+    tipo: tour.tipo || "",
+    cliente: tour.cliente || "",
+    pax: tour.pax || "",
+    guia: tour.guiaNombre || "",
+    punto: tour.puntoEncuentro || "",
+    fecha: tour.fecha || "",
+    hora: tour.hora || "",
+    ref: "CT-" + String(tour.id).slice(-6),
+    estadoPago: tour.estadoPago || "",
+    montoPendiente: tour.montoPendiente || "",
+  });
+  if (detalleCliente && detalleCliente.Idioma) params.set("idioma", detalleCliente.Idioma);
+  const url = "https://alechamorrosoto-droid.github.io/Chamorrotoursapp/ticket.html?" + params.toString();
+  const mensaje = "🌊 ¡Tu tour con Chamorro Tours está confirmado! Aquí tienes todos los detalles y tu código de reserva:\n\n" + url;
+  const waUrl = "https://wa.me/?text=" + encodeURIComponent(mensaje);
+  window.open(waUrl, "_blank");
+  return url;
+}
+
+function enviarConfirmacionPorCorreo(tour, detalleCliente, onSuccess) {
+  const email = tour.emailCliente || (detalleCliente && detalleCliente.Email) || "";
+  if (!email) {
+    alert("Este tour no tiene un email guardado. Agrégalo en '✏️ Editar' (campo 'Email del cliente') o pídele al huésped que lo ponga en su formulario, y vuelve a intentar.");
+    return;
+  }
+  const ti = TIPOS_TOUR[tour.tipo] || TIPOS_TOUR.personalizado;
+  const params = new URLSearchParams({
+    tour: ti.label.replace(/^\S+\s/, ""),
+    tipo: tour.tipo || "",
+    cliente: tour.cliente || "",
+    pax: tour.pax || "",
+    guia: tour.guiaNombre || "",
+    punto: tour.puntoEncuentro || "",
+    fecha: tour.fecha || "",
+    hora: tour.hora || "",
+    ref: "CT-" + String(tour.id).slice(-6),
+    estadoPago: tour.estadoPago || "",
+    montoPendiente: tour.montoPendiente || "",
+  });
+  if (detalleCliente && detalleCliente.Idioma) params.set("idioma", detalleCliente.Idioma);
+  const url = "https://alechamorrosoto-droid.github.io/Chamorrotoursapp/ticket.html?" + params.toString();
+
+  if (!confirm("¿Enviar la confirmación por correo a " + email + "?")) return;
+
+  fetch(SHEET_SYNC_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      action: "enviar_ticket_email",
+      email,
+      cliente: tour.cliente || "",
+      tour: ti.label.replace(/^\S+\s/, ""),
+      fecha: tour.fecha || "",
+      url,
+    }),
+  }).then(() => {
+    alert("Correo enviado a " + email + " (revisa en unos minutos que haya llegado bien).");
+    if (onSuccess) onSuccess();
+  }).catch(() => {
+    alert("No se pudo enviar. Revisa tu conexión e intenta de nuevo.");
+  });
 }
 
 const MESES_NOMBRES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -294,7 +359,7 @@ function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill, forcedI
   const [tipoKey, setTipoKey] = React.useState(tourToEdit ? tourToEdit.tipo : (prefill?.tipoKey || "kayaking"));
   const tipo = TIPOS_TOUR[tipoKey];
   const [f, setF] = React.useState(() => tourToEdit ? {
-    fecha: tourToEdit.fecha, hora: tourToEdit.hora || "", puntoEncuentro: tourToEdit.puntoEncuentro || "", contactoCliente: tourToEdit.contactoCliente || "", cliente: tourToEdit.cliente,
+    fecha: tourToEdit.fecha, hora: tourToEdit.hora || "", puntoEncuentro: tourToEdit.puntoEncuentro || "", contactoCliente: tourToEdit.contactoCliente || "", emailCliente: tourToEdit.emailCliente || "", propertyManagement: tourToEdit.propertyManagement || "Directo", cliente: tourToEdit.cliente,
     pax: tourToEdit.pax || "", paxCompartido: tourToEdit.paxCompartido || "", paxSolo: tourToEdit.paxSolo || "",
     precioPax: tourToEdit.precioPax, precioSolo: tourToEdit.precioSolo || 0,
     comisionPct: tourToEdit.comisionPct, pagoGuia: tourToEdit.pagoGuia,
@@ -303,7 +368,7 @@ function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill, forcedI
     montoPagado: tourToEdit.montoPagado ?? "",
   } : {
     fecha: fechaInicial || new Date().toISOString().split("T")[0],
-    hora: "", puntoEncuentro: "", contactoCliente: "",
+    hora: "", puntoEncuentro: "", contactoCliente: "", emailCliente: "", propertyManagement: prefill?.propertyManagement || "Directo",
     cliente: prefill?.cliente || "", pax: prefill?.pax || "", paxCompartido: "", paxSolo: "",
     precioPax: tipo.precioPax, precioSolo: tipo.precioSolo || 0,
     comisionPct: COMISION_DEFAULT, pagoGuia: 0,
@@ -312,6 +377,7 @@ function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill, forcedI
     montoPagado: "",
   });
   const h = (k, v) => setF(p => ({ ...p, [k]: v }));
+  const [pmModo, setPmModo] = React.useState(() => (f.propertyManagement === "Directo" || PROPERTY_MANAGERS.includes(f.propertyManagement)) ? f.propertyManagement : "__new");
   function changeTipo(key) {
     setTipoKey(key);
     const t = TIPOS_TOUR[key];
@@ -369,6 +435,24 @@ function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill, forcedI
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "Contacto del cliente (opcional)"),
         React.createElement("input", { type: "text", value: f.contactoCliente, onChange: e => h("contactoCliente", e.target.value), style: inp, placeholder: "Ej: +506 8888-8888" })
+      ),
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Email del cliente (opcional)"),
+        React.createElement("input", { type: "email", value: f.emailCliente, onChange: e => h("emailCliente", e.target.value), style: inp, placeholder: "Ej: huesped@correo.com" })
+      ),
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Reserva vía"),
+        React.createElement("select", { value: pmModo, onChange: e => {
+            const val = e.target.value;
+            setPmModo(val);
+            if (val !== "__new") h("propertyManagement", val);
+            else h("propertyManagement", "");
+          }, style: inp },
+          React.createElement("option", { value: "Directo" }, "Directo (sin property management)"),
+          ...PROPERTY_MANAGERS.map(p => React.createElement("option", { key: p, value: p }, p)),
+          React.createElement("option", { value: "__new" }, "+ Otro (hotel/persona con comisión)")
+        ),
+        pmModo === "__new" ? React.createElement("input", { type: "text", value: f.propertyManagement, onChange: e => h("propertyManagement", e.target.value), style: { ...inp, marginTop: 8 }, placeholder: "Nombre del hotel o persona" }) : null
       )
     ),
     React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 16 } },
@@ -450,7 +534,7 @@ function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill, forcedI
 }
 
 // ── DETALLE ───────────────────────────────────────────────────────────────────
-function TourDetalle({ tour, onClose, onDelete, onEdit, detalleCliente, onVerDetalleCliente }) {
+function TourDetalle({ tour, onClose, onDelete, onEdit, detalleCliente, onVerDetalleCliente, onMarkTicketEnviado, onMarkConfirmado }) {
   const tipoInfo = TIPOS_TOUR[tour.tipo] || TIPOS_TOUR.personalizado;
   const paxText = tipoInfo.esAtv && (tour.paxCompartido > 0 || tour.paxSolo > 0)
     ? [tour.paxCompartido > 0 ? tour.paxCompartido + " compartido" : "", tour.paxSolo > 0 ? tour.paxSolo + " solo" : ""].filter(Boolean).join(" · ")
@@ -461,6 +545,10 @@ function TourDetalle({ tour, onClose, onDelete, onEdit, detalleCliente, onVerDet
   }, [detalleCliente]);
 
   return React.createElement("div", { style: { padding: 20 } },
+    tour.pendienteConfirmar ? React.createElement("div", { style: { background: "#f59e0b18", border: "1px dashed #f59e0b", borderRadius: 10, padding: "10px 12px", marginBottom: 14 } },
+      React.createElement("div", { style: { fontSize: 12.5, color: "#f59e0b", fontWeight: 700, marginBottom: 6 } }, "Este tour se creó automático desde un lead — falta que lo confirmes (guía, hora, precio, etc.)"),
+      React.createElement("button", { onClick: () => onMarkConfirmado(tour), style: { background: "#f59e0b", border: "none", color: "#000", borderRadius: 6, padding: "6px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" } }, "Marcar como confirmado")
+    ) : null,
     React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 } },
       React.createElement("div", null,
         React.createElement("div", { style: { display: "inline-flex", alignItems: "center", gap: 6, background: "linear-gradient(135deg,#0ea5e920,#0369a120)", border: "1px solid #0ea5e950", borderRadius: 8, padding: "4px 10px", marginBottom: 8 } },
@@ -473,9 +561,12 @@ function TourDetalle({ tour, onClose, onDelete, onEdit, detalleCliente, onVerDet
           [tour.hora ? "🕐 " + tour.hora : "", tour.puntoEncuentro ? "📍 " + tour.puntoEncuentro : ""].filter(Boolean).join("  ·  ")
         ) : null,
         tour.contactoCliente ? React.createElement("div", { style: { fontSize: 12, color: "#94a3b8", marginTop: 2 } }, "📞 " + tour.contactoCliente) : null,
+        tour.emailCliente ? React.createElement("div", { style: { fontSize: 12, color: "#94a3b8", marginTop: 2 } }, "✉️ " + tour.emailCliente) : null,
         React.createElement("div", { style: { marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
           React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: ESTADO_PAGO_COLOR[tour.estadoPago || "Pendiente"], background: ESTADO_PAGO_COLOR[tour.estadoPago || "Pendiente"] + "20", border: "1px solid " + ESTADO_PAGO_COLOR[tour.estadoPago || "Pendiente"] + "50", borderRadius: 6, padding: "3px 8px" } }, "💵 " + (tour.estadoPago || "Pendiente")),
-          (tour.estadoPago === "Parcial" && tour.montoPendiente > 0) ? React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: "#f59e0b" } }, "Falta cobrar: " + fmt(tour.montoPendiente)) : null
+          (tour.estadoPago === "Parcial" && tour.montoPendiente > 0) ? React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: "#f59e0b" } }, "Falta cobrar: " + fmt(tour.montoPendiente)) : null,
+          (tour.estadoPago && tour.estadoPago !== "Pendiente" && !tour.ticketEnviado) ? React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: "#c4b5fd", background: "#a78bfa20", border: "1px solid #a78bfa50", borderRadius: 6, padding: "3px 8px" } }, "📩 Pendiente de enviar ticket") : null,
+          (tour.ticketEnviado) ? React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: "#4ade80" } }, "✓ Ticket enviado") : null
         )
       ),
       React.createElement("button", { onClick: onClose, style: { background: "transparent", border: "none", color: "#475569", fontSize: 22, cursor: "pointer" } }, "✕")
@@ -530,6 +621,8 @@ function TourDetalle({ tour, onClose, onDelete, onEdit, detalleCliente, onVerDet
       )
     ),
     React.createElement("button", { onClick: () => compartirWhatsApp(tour), style: { width: "100%", background: "#0d3320", border: "1px solid #25D366", color: "#25D366", borderRadius: 8, padding: 11, cursor: "pointer", fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "📲 Enviar al guía por WhatsApp"),
+    React.createElement("button", { onClick: () => { enviarConfirmacionCliente(tour, detalleCliente); onMarkTicketEnviado(tour); }, style: { width: "100%", background: "#1a1030", border: "1px solid #a78bfa", color: "#c4b5fd", borderRadius: 8, padding: 11, cursor: "pointer", fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "🎫 Enviar confirmación al cliente"),
+    React.createElement("button", { onClick: () => enviarConfirmacionPorCorreo(tour, detalleCliente, () => onMarkTicketEnviado(tour)), style: { width: "100%", background: "#1a1030", border: "1px solid #a78bfa", color: "#c4b5fd", borderRadius: 8, padding: 11, cursor: "pointer", fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "✉️ Enviar confirmación por correo"),
     React.createElement("button", { onClick: () => compartirLinkCliente(tour), style: { width: "100%", background: "#0a1e2a", border: "1px solid #0ea5e9", color: "#7ec8e3", borderRadius: 8, padding: 11, cursor: "pointer", fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "📩 Pedirle datos al cliente (vía PM)"),
     React.createElement("div", { style: { display: "flex", gap: 10 } },
       React.createElement("button", { onClick: () => onEdit(tour), style: { flex: 1, background: "transparent", border: "1px solid #0ea5e9", color: "#7ec8e3", borderRadius: 8, padding: 10, cursor: "pointer", fontSize: 13 } }, "✏️ Editar"),
@@ -548,10 +641,10 @@ function DayList({ tours, onSelect, onAdd, onClose }) {
     React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 } },
       ...tours.map(t => {
         const ti = TIPOS_TOUR[t.tipo] || TIPOS_TOUR.personalizado;
-        return React.createElement("div", { key: t.id, onClick: () => onSelect(t), style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 10, padding: "12px 14px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" } },
+        return React.createElement("div", { key: t.id, onClick: () => onSelect(t), style: { background: t.pendienteConfirmar ? "#f59e0b10" : "#0f2027", border: t.pendienteConfirmar ? "1px dashed #f59e0b" : "1px solid #1e3a4a", borderRadius: 10, padding: "12px 14px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" } },
           React.createElement("div", null,
             React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#e8f4f8" } }, ti.label + " · " + t.cliente),
-            React.createElement("div", { style: { fontSize: 11, color: "#7ec8e3", marginTop: 2 } }, t.guiaNombre)
+            React.createElement("div", { style: { fontSize: 11, color: t.pendienteConfirmar ? "#f59e0b" : "#7ec8e3", marginTop: 2 } }, t.pendienteConfirmar ? "Sin confirmar" : t.guiaNombre)
           ),
           React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: ESTADO_PAGO_COLOR[t.estadoPago || "Pendiente"] } }, fmt(t.ganancia))
         );
@@ -724,6 +817,43 @@ function LeadsView({ leads, onAdd, onOpen, onClose, onSync }) {
   );
 }
 
+// ── EMAILS RECOPILADOS ───────────────────────────────────────────────────────
+function EmailsView({ leads, detallesCliente, onClose }) {
+  const [copiado, setCopiado] = React.useState(false);
+
+  const emails = React.useMemo(() => {
+    const set = new Set();
+    leads.forEach(l => { if (l.email && l.email.includes("@")) set.add(l.email.trim().toLowerCase()); });
+    detallesCliente.forEach(d => { if (d.Email && d.Email.includes("@")) set.add(d.Email.trim().toLowerCase()); });
+    return [...set].sort();
+  }, [leads, detallesCliente]);
+
+  async function copiarTodos() {
+    try {
+      await navigator.clipboard.writeText(emails.join("\n"));
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch (e) {
+      prompt("Copia estos emails:", emails.join("\n"));
+    }
+  }
+
+  return React.createElement("div", { style: { padding: 20 } },
+    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } },
+      React.createElement("p", { style: { color: "#7ec8e3", fontWeight: 700, fontSize: 13, letterSpacing: 1, textTransform: "uppercase" } }, "Emails recopilados (" + emails.length + ")"),
+      React.createElement("button", { onClick: onClose, style: { background: "transparent", border: "none", color: "#475569", fontSize: 22, cursor: "pointer" } }, "✕")
+    ),
+    React.createElement("p", { style: { fontSize: 12.5, color: "#94a3b8", marginBottom: 16, lineHeight: 1.6 } },
+      "Se juntan de todos los leads y formularios de huéspedes, sin repetidos. Úsalos para promos o novedades — solo si la persona dio consentimiento para recibir ese tipo de correos."
+    ),
+    emails.length === 0 ? React.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: "#475569", fontSize: 13 } }, "Aún no hay emails guardados.") : null,
+    emails.length > 0 ? React.createElement("div", { style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 10, padding: 14, marginBottom: 16, maxHeight: 320, overflowY: "auto" } },
+      ...emails.map(e => React.createElement("div", { key: e, style: { fontSize: 13, color: "#e2e8f0", padding: "4px 0", borderBottom: "1px solid #1e3a4a" } }, e))
+    ) : null,
+    emails.length > 0 ? React.createElement("button", { onClick: copiarTodos, style: { width: "100%", background: "linear-gradient(135deg,#0ea5e9,#0369a1)", color: "#fff", border: "none", borderRadius: 8, padding: 12, fontWeight: 700, cursor: "pointer", fontSize: 14 } }, copiado ? "Copiado" : "Copiar todos") : null
+  );
+}
+
 // ── AJUSTES / RESPALDO ───────────────────────────────────────────────────────
 function AjustesView({ meses, onClose }) {
   const fileRef = React.useRef(null);
@@ -800,7 +930,7 @@ function App() {
 
   function save(key, updated) { localStorage.setItem("chamorro_tours_data", JSON.stringify(updated)); return updated; }
   function mesKeyDeFecha(fecha) { const [y, m] = (fecha || "").split("-"); return y && m ? y + "-" + m : null; }
-  function addTour(tour, leadId) {
+  function addTourSilencioso(tour, leadId) {
     const k = mesKeyDeFecha(tour.fecha);
     setMeses(p => {
       let base = p;
@@ -810,7 +940,35 @@ function App() {
     });
     syncTourASheets(tour);
     if (leadId) setLeads(p => saveLeads(p.map(l => l.id === leadId ? { ...l, estado: "Convertido" } : l)));
+  }
+  function addTour(tour, leadId) {
+    addTourSilencioso(tour, leadId);
     setPanel(null);
+  }
+  function existeTourDeLead(leadId) {
+    return Object.values(meses).some(mes => (mes.tours || []).some(t => t.origenLeadId === leadId));
+  }
+  function crearTourAutomaticoDesdeLead(lead) {
+    if (!lead.fecha) return; // solo si ya trae fecha tentativa
+    if (existeTourDeLead(lead.id)) return; // evitar duplicados si se vuelve a sincronizar
+    const tipoKey = TIPOS_TOUR[lead.tourInteres] ? lead.tourInteres : "kayaking";
+    const tipo = TIPOS_TOUR[tipoKey];
+    const tour = {
+      id: Date.now() + Math.floor(Math.random() * 1000),
+      origenLeadId: lead.id,
+      pendienteConfirmar: true,
+      fecha: lead.fecha, hora: "", puntoEncuentro: "",
+      contactoCliente: lead.contacto || "", emailCliente: lead.email || "",
+      propertyManagement: lead.propertyManagement || "Directo",
+      cliente: lead.huesped + (lead.unidad ? " (" + lead.unidad + ")" : ""),
+      tipo: tipoKey, pax: lead.pax || "", paxCompartido: "", paxSolo: "",
+      precioPax: tipo.precioPax, precioSolo: tipo.precioSolo || 0,
+      comisionPct: COMISION_DEFAULT, pagoGuia: 0,
+      fruta: 0, transporte: 0, kayaks: 0, entradas: 0, otros: 0,
+      metodoPago: "Transferencia", guiaNombre: "", notas: lead.notas || "", estadoPago: "Pendiente",
+      montoPagado: "",
+    };
+    addTourSilencioso(tour, lead.id);
   }
   function updateTour(tour) {
     const keyDestino = mesKeyDeFecha(tour.fecha);
@@ -845,6 +1003,7 @@ function App() {
   }
   function mergeLeadsRemotos(remotos) {
     let nuevos = 0;
+    const nuevosConFecha = [];
     setLeads(p => {
       const eliminados = getEliminados();
       const localById = new Map(p.map(l => [String(l.id), l]));
@@ -861,6 +1020,7 @@ function App() {
           resultado.push({ ...r, estado: local.estado || r.estado });
         } else {
           nuevos++;
+          if (r.fecha) nuevosConFecha.push(r);
           resultado.push(r);
         }
       });
@@ -868,6 +1028,7 @@ function App() {
       p.forEach(l => { if (!idsRemotos.has(String(l.id)) && !eliminados.has(String(l.id))) resultado.push(l); });
       return saveLeads(resultado);
     });
+    nuevosConFecha.forEach(lead => crearTourAutomaticoDesdeLead(lead));
     return nuevos;
   }
   function saveDetallesCliente(updated) { localStorage.setItem("chamorro_detalles_cliente", JSON.stringify(updated)); return updated; }
@@ -903,7 +1064,7 @@ function App() {
     setPanel({
       tipo: "form",
       dia: lead.fecha || (year + "-" + String(month).padStart(2, "0") + "-01"),
-      prefill: { cliente: lead.huesped + (lead.unidad ? " (" + lead.unidad + ")" : ""), pax: lead.pax || "", tipoKey: lead.tourInteres || "kayaking", notas },
+      prefill: { cliente: lead.huesped + (lead.unidad ? " (" + lead.unidad + ")" : ""), pax: lead.pax || "", tipoKey: lead.tourInteres || "kayaking", notas, propertyManagement: lead.propertyManagement || "Directo" },
       leadId: lead.id,
     });
   }
@@ -935,6 +1096,7 @@ function App() {
           "👥",
           (leads.filter(l => l.estado === "Pendiente").length + detallesCliente.filter(d => !detallesVistos.has(clave(d))).length) > 0 ? React.createElement("span", { style: { position: "absolute", top: -5, right: -5, background: "#f59e0b", color: "#000", fontSize: 10, fontWeight: 800, borderRadius: 10, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" } }, leads.filter(l => l.estado === "Pendiente").length + detallesCliente.filter(d => !detallesVistos.has(clave(d))).length) : null
         ),
+        React.createElement("button", { onClick: () => setPanel({ tipo: "emails" }), style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 8, padding: "8px 12px", color: "#7ec8e3", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Emails"),
         React.createElement("button", { onClick: async e => { const btn = e.currentTarget; btn.disabled = true; const txt = btn.textContent; btn.textContent = "⏳..."; try { await exportarExcel(meses); } finally { btn.disabled = false; btn.textContent = txt; } }, style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 8, padding: "8px 12px", color: "#7ec8e3", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "⬇ Excel"),
         React.createElement("button", { onClick: () => setPanel({ tipo: "form", dia: esHoy(hoy.getDate()) ? year+"-"+String(month).padStart(2,"0")+"-"+String(hoy.getDate()).padStart(2,"0") : year+"-"+String(month).padStart(2,"0")+"-01" }), style: { background: "linear-gradient(135deg,#0ea5e9,#0369a1)", border: "none", borderRadius: 8, padding: "8px 14px", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "+ Tour")
       )
@@ -982,13 +1144,14 @@ function App() {
             style: { minHeight: 72, background: tieneTour ? "linear-gradient(145deg,#0c2d45,#0f3555)" : esDiaHoy ? "#0f2535" : "#0a1a24", border: tieneTour ? "1.5px solid #0ea5e9" : esDiaHoy ? "1.5px solid #334155" : "1px solid #12293a", borderRadius: 10, padding: "7px 6px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 3, position: "relative" }
           },
             React.createElement("div", { style: { fontSize: 13, fontWeight: esDiaHoy ? 800 : 600, color: esDiaHoy ? "#0ea5e9" : esFinDeSemana ? "#64748b" : "#94a3b8", lineHeight: 1 } }, dia),
-            ...ts.map(t => {
+            ...ts.slice(0, 3).map(t => {
               const ti = TIPOS_TOUR[t.tipo] || TIPOS_TOUR.personalizado;
-              return React.createElement("div", { key: t.id, style: { background: "linear-gradient(135deg,#0ea5e930,#0369a120)", border: "1px solid #0ea5e950", borderRadius: 5, padding: "3px 5px" } },
+              return React.createElement("div", { key: t.id, style: { background: t.pendienteConfirmar ? "#f59e0b18" : "linear-gradient(135deg,#0ea5e930,#0369a120)", border: t.pendienteConfirmar ? "1.5px dashed #f59e0b" : "1px solid #0ea5e950", borderRadius: 5, padding: "3px 5px" } },
                 React.createElement("div", { style: { fontSize: 9, color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, ti.label),
-                React.createElement("div", { style: { fontSize: 10, color: ESTADO_PAGO_COLOR[t.estadoPago || "Pendiente"], fontWeight: 700 } }, fmt(t.ganancia))
+                t.pendienteConfirmar ? React.createElement("div", { style: { fontSize: 9, color: "#f59e0b", fontWeight: 700 } }, "Sin confirmar") : React.createElement("div", { style: { fontSize: 10, color: ESTADO_PAGO_COLOR[t.estadoPago || "Pendiente"], fontWeight: 700 } }, fmt(t.ganancia))
               );
             }),
+            ts.length > 3 ? React.createElement("div", { style: { fontSize: 9.5, color: "#7ec8e3", fontWeight: 700, textAlign: "center", padding: "2px 0" } }, "+ " + (ts.length - 3) + " más") : null,
             esDiaHoy ? React.createElement("div", { style: { position: "absolute", bottom: 5, right: 5, width: 5, height: 5, borderRadius: "50%", background: "#0ea5e9" } }) : null
           );
         })
@@ -1010,10 +1173,13 @@ function App() {
         panel.tipo === "detalle" ? React.createElement(TourDetalle, { tour: panel.tour, onClose: () => setPanel(null), onDelete: deleteTour, onEdit: t => setPanel({ tipo: "form", dia: t.fecha, tour: t }),
           detalleCliente: detallesCliente.filter(d => String(d.TourId) === String(panel.tour.id)).sort((a,b) => String(b.Enviado).localeCompare(String(a.Enviado)))[0] || null,
           onVerDetalleCliente: (d) => marcarDetalleVisto(clave(d)),
+          onMarkTicketEnviado: (t) => updateTour({ ...t, ticketEnviado: true }),
+          onMarkConfirmado: (t) => updateTour({ ...t, pendienteConfirmar: false }),
         }) : null,
         panel.tipo === "lista" ? React.createElement(DayList, { tours: panel.tours, onSelect: t => setPanel({ tipo: "detalle", tour: t }), onAdd: () => setPanel({ tipo: "form", dia: panel.dia }), onClose: () => setPanel(null) }) : null,
         panel.tipo === "form" ? React.createElement(TourForm, { onSave: panel.tour ? updateTour : (t) => addTour(t, panel.leadId), onCancel: () => setPanel(null), fechaInicial: panel.dia, tourToEdit: panel.tour, prefill: panel.prefill, forcedId: panel.leadId }) : null,
         panel.tipo === "leads" ? React.createElement(LeadsView, { leads, onAdd: () => setPanel({ tipo: "leadForm" }), onOpen: l => setPanel({ tipo: "leadForm", lead: l }), onClose: () => setPanel(null), onSync: mergeLeadsRemotos }) : null,
+        panel.tipo === "emails" ? React.createElement(EmailsView, { leads, detallesCliente, onClose: () => setPanel(null) }) : null,
         panel.tipo === "leadForm" ? React.createElement(LeadForm, { onSave: panel.lead ? updateLead : addLead, onCancel: () => setPanel({ tipo: "leads" }), leadToEdit: panel.lead, onConvert: convertirLead, onDelete: deleteLead }) : null,
         panel.tipo === "ajustes" ? React.createElement(AjustesView, { meses, onClose: () => setPanel(null) }) : null
       )

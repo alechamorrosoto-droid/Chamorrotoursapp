@@ -6,7 +6,7 @@
   <title>Chamorro Tours · Solicitud de Tour</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Baloo+2:wght@700;800&family=Permanent+Marker&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
@@ -26,7 +26,9 @@
     body { background: var(--sand); font-family: -apple-system, 'Inter', system-ui, sans-serif; color: var(--ink); min-height: 100vh; padding-bottom: 48px; }
     .display { font-family: 'Fraunces', serif; }
 
-    .contour { display: block; margin: 36px auto 0; }
+    .wordmark { display: flex; align-items: baseline; justify-content: center; gap: 6px; margin: 18px auto 0; }
+    .word-chamorro { font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: 24px; color: var(--teal); }
+    .word-tours { font-family: 'Permanent Marker', cursive; font-weight: 400; font-size: 16px; color: #A6402F; transform: rotate(-4deg); display: inline-block; }
 
     .header { padding: 18px 16px 6px; text-align: center; }
     .header h1 { font-size: 24px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
@@ -41,7 +43,8 @@
     label:first-of-type { margin-top: 0; }
     label .req { color: var(--rust); }
 
-    input, select, textarea { width: 100%; background: var(--sand); border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; color: var(--ink); font-size: 15px; font-family: inherit; outline: none; transition: border-color 0.15s; }
+    input, select, textarea { width: 100%; background: var(--sand); border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; color: var(--ink); font-size: 15px; font-family: inherit; outline: none; transition: border-color 0.15s; box-sizing: border-box; }
+    input[type="date"] { -webkit-appearance: none; appearance: none; }
     input:focus, select:focus, textarea:focus { border-color: var(--teal); }
     textarea { min-height: 80px; resize: vertical; }
 
@@ -63,38 +66,44 @@
 
     .client-link { text-align: left; border-top: 1px solid var(--line); margin-top: 28px; padding-top: 22px; }
     .client-link .eyebrow { font-size: 10.5px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--teal); font-weight: 700; margin-bottom: 8px; }
+    .callout { margin-top: 10px; background: var(--sand); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; font-size: 13.5px; color: var(--ink); line-height: 1.6; }
+    .callout .eyebrow { font-size: 10.5px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--teal); font-weight: 700; display: block; margin-bottom: 6px; }
+    .callout ul { margin: 4px 0 0 18px; padding: 0; }
+    .callout li { margin-bottom: 2px; }
     .client-link p { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 14px; max-width: none; }
   </style>
 </head>
 <body>
-  <svg class="contour" width="160" height="14" viewBox="0 0 160 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M2 7C14 1, 22 13, 34 7S54 1, 66 7s20 6, 32 0 20-6, 32 0 20 6, 32 0" stroke="#0B5D52" stroke-width="1.4" stroke-linecap="round"/>
-  </svg>
+    <div class="wordmark">
+    <span class="word-chamorro">Chamorro</span><span class="word-tours">Tours</span>
+  </div>
 
   <div class="header">
-    <h1 class="display">Chamorro Tours</h1>
-    <p>Solicitud de tour</p>
+    <h1 class="display">Solicitud de tour</h1>
   </div>
 
   <div class="wrap">
     <div id="form-pane">
-      <p class="intro">Completa los datos del huésped interesado y nos pondremos en contacto para coordinar el tour. Los campos con <span style="color:#A6402F">*</span> son requeridos.</p>
+      <p class="intro" id="texto-intro">Completa los datos del huésped interesado y nos pondremos en contacto para coordinar el tour. Los campos con <span style="color:#A6402F">*</span> son requeridos.</p>
 
       <div class="card">
-        <label>Nombre del huésped / grupo <span class="req">*</span></label>
+        <label id="label-huesped">Nombre del huésped / grupo <span class="req">*</span></label>
         <input type="text" id="huesped" placeholder="Ej: Familia Smith" />
 
-        <label>Hotel, Villa o Bungalow</label>
+        <label id="label-unidad">Hotel, Villa o Bungalow</label>
         <input type="text" id="unidad" placeholder="Ej: Villa 4, Bungalow 2 o Hotel Le Cameleon" />
 
         <label>Contacto del huésped o tuyo (teléfono/WhatsApp)</label>
         <input type="text" id="contacto" placeholder="Ej: +506 8888-8888" />
 
+        <label>Email <span class="req">*</span></label>
+        <input type="email" id="email" placeholder="Ej: huesped@correo.com" />
+
         <label>Fecha tentativa del tour</label>
         <input type="date" id="fecha" />
 
         <label>Tour de interés</label>
-        <select id="tour">
+        <select id="tour" onchange="actualizarPrecioEstimado(); actualizarQueTraer();">
           <option value="">Aún no deciden</option>
           <option value="kayaking">Kayaking</option>
           <option value="dolphin">Dolphin Tour</option>
@@ -105,8 +114,11 @@
           <option value="personalizado">Otro / Personalizado</option>
         </select>
 
+        <div id="precio-estimado" class="callout" style="display:none;"></div>
+        <div id="que-traer" class="callout" style="display:none;"></div>
+
         <label># de personas</label>
-        <input type="number" id="pax" min="1" placeholder="4" />
+        <input type="number" id="pax" min="1" placeholder="4" oninput="actualizarPrecioEstimado()" />
 
         <label>Edades del grupo</label>
         <input type="text" id="edades" placeholder="Ej: 2 adultos, niños de 8 y 12" />
@@ -129,7 +141,12 @@
         <label>Notas adicionales</label>
         <textarea id="notas" placeholder="Horario preferido, movilidad reducida, celebración especial, etc."></textarea>
 
-        <label>Tu nombre (quien envía)</label>
+        <div id="bloque-referente" style="display:none;">
+          <label>Nombre del hotel, Airbnb o persona <span class="req">*</span></label>
+          <input type="text" id="pmReferente" placeholder="Ej: Hotel Le Cameleon, Airbnb de Juan, etc." />
+        </div>
+
+        <label id="label-remitente">Tu nombre (quien envía)</label>
         <input type="text" id="remitente" placeholder="Ej: Diana" />
 
         <div class="err" id="err"></div>
@@ -158,11 +175,94 @@
 
 <script>
 const SHEET_SYNC_URL = "https://script.google.com/macros/s/AKfycbxN_bxd5yxGWryQ-pMCqudxvN3vos4IibGqJsUofjbFVoRbJO0kw1gyoO2FNRWUYho49Q/exec";
-const CLIENTE_FORM_URL = "https://chamorrotours.netlify.app/cliente.html";
+const CLIENTE_FORM_URL = "https://alechamorrosoto-droid.github.io/Chamorrotoursapp/cliente.html";
 
 let ultimoLeadId = null;
 
 function v(id) { return document.getElementById(id).value.trim(); }
+
+const PRECIOS = {
+  kayaking: { pax: 65 },
+  dolphin: { pax: 120 },
+  snorkeling: { pax: 90 },
+  chocolate: { pax: 80 },
+  atv1: { compartido: 140, solo: 190 },
+  atv2: { compartido: 120, solo: 180 },
+};
+
+function actualizarPrecioEstimado() {
+  const tour = v("tour");
+  const pax = Number(v("pax")) || 0;
+  const box = document.getElementById("precio-estimado");
+  const precios = PRECIOS[tour];
+  if (!precios) { box.style.display = "none"; return; }
+
+  let texto;
+  if (precios.pax) {
+    texto = "<span class='eyebrow'>Precio</span>$" + precios.pax + " por persona";
+    if (pax > 0) texto += " · Total: $" + (precios.pax * pax);
+  } else {
+    texto = "<span class='eyebrow'>Precio</span>$" + precios.compartido + "/persona (quad compartido) o $" + precios.solo + "/persona (quad solo)";
+    if (pax > 0) texto += " · Total compartido: $" + (precios.compartido * pax) + " · Total solo: $" + (precios.solo * pax);
+  }
+  box.innerHTML = texto;
+  box.style.display = "block";
+}
+
+const QUE_TRAER = {
+  kayaking: ["Traje de baño", "Zapatos de agua o sandalias con correa", "Toalla", "Bloqueador biodegradable", "Cambio de ropa", "Bolsa impermeable para el celular"],
+  dolphin: ["Traje de baño", "Zapatos de agua", "Toalla", "Bloqueador biodegradable", "Medicamento para el mareo, si lo necesita", "Bolsa impermeable para el celular"],
+  snorkeling: ["Traje de baño", "Zapatos de agua", "Toalla", "Bloqueador biodegradable", "Bolsa impermeable para el celular"],
+  chocolate: ["Zapatos cómodos para caminar", "Traje de baño (para la catarata)", "Toalla", "Repelente de insectos", "Chaqueta ligera para la lluvia (opcional)"],
+  atv1: ["Zapatos cerrados", "Ropa que no le importe ensuciar o mojar", "Bloqueador solar", "Repelente de insectos", "Traje de baño (para la parada en la catarata)"],
+  atv2: ["Zapatos cerrados", "Ropa que no le importe ensuciar o mojar", "Bloqueador solar", "Repelente de insectos", "Traje de baño (para las paradas en las cataratas)"],
+};
+
+function actualizarQueTraer() {
+  const tour = v("tour");
+  const box = document.getElementById("que-traer");
+  const lista = QUE_TRAER[tour];
+  if (!lista) { box.style.display = "none"; return; }
+  box.innerHTML = "<span class='eyebrow'>Qué llevar</span><ul>"
+    + lista.map(item => "<li>" + item + "</li>").join("") + "</ul>";
+  box.style.display = "block";
+}
+
+// El origen se decide según el link, no lo elige quien llena el formulario:
+// - link normal (sin parámetro)  -> Directo, sin comisión para nadie (para WhatsApp público)
+// - link con ?via=cdc            -> Casas del Caribe, fijo (para Diana)
+// - link con ?via=otro           -> campo obligatorio para escribir el nombre del hotel/Airbnb/persona
+//                                    a quien se le paga comisión
+const origenParams = new URLSearchParams(window.location.search);
+const VIA = origenParams.get("via"); // null | "cdc" | "otro"
+const ES_VIA_ALGUIEN = VIA === "cdc" || VIA === "otro";
+
+function actualizarCampoUnidad() {
+  const labelHuesped = document.getElementById("label-huesped");
+  const label = document.getElementById("label-unidad");
+  const input = document.getElementById("unidad");
+  const bloqueReferente = document.getElementById("bloque-referente");
+  const labelRemitente = document.getElementById("label-remitente");
+  const inputRemitente = document.getElementById("remitente");
+  const textoIntro = document.getElementById("texto-intro");
+  if (ES_VIA_ALGUIEN) {
+    labelHuesped.innerHTML = "Nombre del huésped / grupo <span class=\"req\">*</span>";
+    label.textContent = VIA === "cdc" ? "Casa, Villa o Bungalow" : "Hotel, Villa o Bungalow";
+    input.placeholder = VIA === "cdc" ? "Ej: Villa 4, Bungalow 2, Casa del Mar" : "Ej: Villa 4, Bungalow 2 o Hotel Le Cameleon";
+    bloqueReferente.style.display = VIA === "otro" ? "block" : "none";
+  } else {
+    labelHuesped.innerHTML = "Nombre completo <span class=\"req\">*</span>";
+    label.textContent = "Alojamiento o punto de recogida (opcional)";
+    input.placeholder = "Ej: Airbnb, hotel, o dónde te recogemos";
+    bloqueReferente.style.display = "none";
+  }
+  if (VIA === "cdc") {
+    textoIntro.innerHTML = "Hola, equipo de Casas del Caribe. Completen los datos del huésped y coordinamos todo enseguida. Los campos con <span style=\"color:#A6402F\">*</span> son requeridos.";
+    labelRemitente.textContent = "¿Quién de Casas del Caribe nos escribe?";
+    inputRemitente.placeholder = "Ej: Diana";
+  }
+}
+actualizarCampoUnidad();
 
 function linkCliente() {
   return CLIENTE_FORM_URL + "?id=" + ultimoLeadId;
@@ -209,6 +309,22 @@ async function enviar() {
     err.style.display = "block";
     return;
   }
+  const email = v("email");
+  if (!email) {
+    err.textContent = "Por favor completa el email del huésped.";
+    err.style.display = "block";
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    err.textContent = "Ese email no se ve válido, revísalo.";
+    err.style.display = "block";
+    return;
+  }
+  if (VIA === "otro" && !v("pmReferente")) {
+    err.textContent = "Por favor completa el nombre del hotel, Airbnb o persona.";
+    err.style.display = "block";
+    return;
+  }
 
   const btn = document.getElementById("btn");
   btn.disabled = true;
@@ -219,10 +335,11 @@ async function enviar() {
   const lead = {
     action: "lead",
     id,
-    propertyManagement: "Casas del Caribe",
+    propertyManagement: VIA === "cdc" ? "Casas del Caribe" : (VIA === "otro" ? (v("pmReferente") || "Otro") : "Directo"),
     huesped, fecha,
     unidad: v("unidad"),
     contacto: v("contacto"),
+    email: v("email"),
     tourInteres: v("tour"),
     pax: Number(pax) || 0,
     edades: v("edades"),
@@ -266,7 +383,8 @@ async function enviar() {
 
 function reiniciar() {
   ultimoLeadId = null;
-  ["huesped","unidad","contacto","fecha","tour","pax","edades","alergias","preferencias","notas","remitente"].forEach(id => document.getElementById(id).value = "");
+  ["huesped","unidad","contacto","email","fecha","tour","pax","edades","alergias","preferencias","notas","remitente"].forEach(id => document.getElementById(id).value = "");
+  if (document.getElementById("pmReferente")) document.getElementById("pmReferente").value = "";
   document.getElementById("ok-pane").style.display = "none";
   document.getElementById("form-pane").style.display = "block";
   window.scrollTo(0, 0);
