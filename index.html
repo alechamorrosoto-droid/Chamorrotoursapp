@@ -854,7 +854,50 @@ function EmailsView({ leads, detallesCliente, onClose }) {
   );
 }
 
-// ── AJUSTES / RESPALDO ───────────────────────────────────────────────────────
+// ── BUSCAR TOURS (por guía, cliente o tipo) ─────────────────────────────────
+function BuscarToursView({ meses, onSelect, onClose }) {
+  const [q, setQ] = React.useState("");
+
+  const todosLosTours = React.useMemo(() => {
+    const lista = [];
+    Object.values(meses).forEach(mes => (mes.tours || []).forEach(t => lista.push(t)));
+    lista.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+    return lista;
+  }, [meses]);
+
+  const filtrados = React.useMemo(() => {
+    const texto = q.trim().toLowerCase();
+    if (!texto) return [];
+    return todosLosTours.filter(t => {
+      const ti = TIPOS_TOUR[t.tipo] || TIPOS_TOUR.personalizado;
+      const campos = [t.cliente, t.guiaNombre, ti.label, t.tipo, t.fecha].filter(Boolean).join(" ").toLowerCase();
+      return campos.includes(texto);
+    });
+  }, [q, todosLosTours]);
+
+  return React.createElement("div", { style: { padding: 20 } },
+    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } },
+      React.createElement("p", { style: { color: "#7ec8e3", fontWeight: 700, fontSize: 13, letterSpacing: 1, textTransform: "uppercase" } }, "Buscar tours"),
+      React.createElement("button", { onClick: onClose, style: { background: "transparent", border: "none", color: "#475569", fontSize: 22, cursor: "pointer" } }, "✕")
+    ),
+    React.createElement("input", {
+      type: "text", value: q, onChange: e => setQ(e.target.value), autoFocus: true,
+      placeholder: "Nombre del cliente, guía, o tipo de tour...",
+      style: { width: "100%", background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 8, padding: "12px 14px", color: "#e2e8f0", fontSize: 14, marginBottom: 16 }
+    }),
+    !q.trim() ? React.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: "#475569", fontSize: 13 } }, "Escribe para buscar entre todos tus tours.") : null,
+    q.trim() && filtrados.length === 0 ? React.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: "#475569", fontSize: 13 } }, "No encontré ningún tour con eso.") : null,
+    filtrados.length > 0 ? React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, maxHeight: 420, overflowY: "auto" } },
+      ...filtrados.map(t => {
+        const ti = TIPOS_TOUR[t.tipo] || TIPOS_TOUR.personalizado;
+        return React.createElement("div", { key: t.id, onClick: () => onSelect(t), style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 10, padding: "12px 14px", cursor: "pointer" } },
+          React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#e8f4f8" } }, ti.label + " · " + t.cliente),
+          React.createElement("div", { style: { fontSize: 11.5, color: "#7ec8e3", marginTop: 3 } }, t.fecha + " · " + (t.guiaNombre || "Sin guía asignar"))
+        );
+      })
+    ) : null
+  );
+}
 function AjustesView({ meses, onClose }) {
   const fileRef = React.useRef(null);
   const pendientes = Object.values(meses).flatMap(m => m.tours).filter(t => (t.estadoPago || "Pendiente") !== "Pagado");
@@ -1096,6 +1139,7 @@ function App() {
           "👥",
           (leads.filter(l => l.estado === "Pendiente").length + detallesCliente.filter(d => !detallesVistos.has(clave(d))).length) > 0 ? React.createElement("span", { style: { position: "absolute", top: -5, right: -5, background: "#f59e0b", color: "#000", fontSize: 10, fontWeight: 800, borderRadius: 10, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" } }, leads.filter(l => l.estado === "Pendiente").length + detallesCliente.filter(d => !detallesVistos.has(clave(d))).length) : null
         ),
+        React.createElement("button", { onClick: () => setPanel({ tipo: "buscarTours" }), style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 8, padding: "8px 12px", color: "#7ec8e3", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Buscar"),
         React.createElement("button", { onClick: () => setPanel({ tipo: "emails" }), style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 8, padding: "8px 12px", color: "#7ec8e3", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "Emails"),
         React.createElement("button", { onClick: async e => { const btn = e.currentTarget; btn.disabled = true; const txt = btn.textContent; btn.textContent = "⏳..."; try { await exportarExcel(meses); } finally { btn.disabled = false; btn.textContent = txt; } }, style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 8, padding: "8px 12px", color: "#7ec8e3", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "⬇ Excel"),
         React.createElement("button", { onClick: () => setPanel({ tipo: "form", dia: esHoy(hoy.getDate()) ? year+"-"+String(month).padStart(2,"0")+"-"+String(hoy.getDate()).padStart(2,"0") : year+"-"+String(month).padStart(2,"0")+"-01" }), style: { background: "linear-gradient(135deg,#0ea5e9,#0369a1)", border: "none", borderRadius: 8, padding: "8px 14px", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" } }, "+ Tour")
@@ -1180,6 +1224,7 @@ function App() {
         panel.tipo === "form" ? React.createElement(TourForm, { onSave: panel.tour ? updateTour : (t) => addTour(t, panel.leadId), onCancel: () => setPanel(null), fechaInicial: panel.dia, tourToEdit: panel.tour, prefill: panel.prefill, forcedId: panel.leadId }) : null,
         panel.tipo === "leads" ? React.createElement(LeadsView, { leads, onAdd: () => setPanel({ tipo: "leadForm" }), onOpen: l => setPanel({ tipo: "leadForm", lead: l }), onClose: () => setPanel(null), onSync: mergeLeadsRemotos }) : null,
         panel.tipo === "emails" ? React.createElement(EmailsView, { leads, detallesCliente, onClose: () => setPanel(null) }) : null,
+        panel.tipo === "buscarTours" ? React.createElement(BuscarToursView, { meses, onSelect: t => setPanel({ tipo: "detalle", tour: t }), onClose: () => setPanel(null) }) : null,
         panel.tipo === "leadForm" ? React.createElement(LeadForm, { onSave: panel.lead ? updateLead : addLead, onCancel: () => setPanel({ tipo: "leads" }), leadToEdit: panel.lead, onConvert: convertirLead, onDelete: deleteLead }) : null,
         panel.tipo === "ajustes" ? React.createElement(AjustesView, { meses, onClose: () => setPanel(null) }) : null
       )
