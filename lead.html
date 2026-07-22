@@ -191,6 +191,7 @@
       <div class="client-link" id="link-cliente-pane">
         <div class="eyebrow">Un paso más</div>
         <p>Comparte este link con el huésped para que llene sus datos directamente (alergias, edades, etc.) — así no tienes que preguntarle tú.</p>
+        <p id="nota-wa" style="font-size:12px; color:var(--muted); margin-bottom:10px;"></p>
         <button class="btn" onclick="compartirLinkClienteWA()">Enviar por WhatsApp</button>
         <button class="btn-ghost" onclick="copiarLinkCliente()" id="btn-copiar">Copiar link</button>
       </div>
@@ -321,7 +322,9 @@ function linkCliente() {
 
 function compartirLinkClienteWA() {
   const mensaje = "Hi! To get everything ready for your tour, could you please fill in a few quick details here?\n\n" + linkCliente();
-  window.open("https://wa.me/?text=" + encodeURIComponent(mensaje), "_blank");
+  const contacto = v("contacto").replace(/[^\d]/g, ""); // solo dígitos, sin +, espacios ni guiones
+  const destino = contacto ? "https://wa.me/" + contacto : "https://wa.me/";
+  window.open(destino + "?text=" + encodeURIComponent(mensaje), "_blank");
 }
 
 async function copiarLinkCliente() {
@@ -432,6 +435,12 @@ async function enviar() {
     document.getElementById("form-pane").style.display = "none";
     document.getElementById("ok-pane").style.display = "block";
     document.getElementById("link-cliente-pane").style.display = ES_VIA_ALGUIEN ? "block" : "none";
+    if (ES_VIA_ALGUIEN) {
+      const contactoLimpio = v("contacto").replace(/[^\d]/g, "");
+      document.getElementById("nota-wa").textContent = contactoLimpio
+        ? "Se va a abrir el chat de WhatsApp con el número que pusiste arriba (" + v("contacto") + ")."
+        : "No pusiste un número de contacto, así que WhatsApp te va a pedir elegir tú mismo a quién mandárselo.";
+    }
     window.scrollTo(0, 0);
   } catch (e) {
     err.textContent = "No se pudo enviar. Revisa tu conexión e intenta de nuevo.";
