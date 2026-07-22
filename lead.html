@@ -104,6 +104,9 @@
         <label>Fecha tentativa del tour</label>
         <input type="date" id="fecha" />
 
+        <label>Hora aproximada que te gustaría (Alejandro confirma la hora exacta después)</label>
+        <input type="time" id="horaEstimada" />
+
         <label>Tour de interés</label>
         <select id="tour" onchange="actualizarPrecioEstimado(); actualizarQueTraer();">
           <option value="">Aún no deciden</option>
@@ -151,6 +154,11 @@
         <div id="bloque-remitente">
           <label id="label-remitente">Tu nombre (quien envía)</label>
           <input type="text" id="remitente" placeholder="Ej: Diana" />
+        </div>
+
+        <div id="bloque-email-pm" style="display:none;">
+          <label>Tu correo (para que también te llegue la confirmación del tour)</label>
+          <input type="email" id="emailPM" placeholder="Ej: diana@casasdelcaribe.com" />
         </div>
 
         <div class="err" id="err"></div>
@@ -282,6 +290,7 @@ function actualizarCampoUnidad() {
     inputRemitente.placeholder = "Ej: Diana";
     document.getElementById("wordmark-propio").style.display = "none";
     document.getElementById("logo-cdc").style.display = "block";
+    document.getElementById("bloque-email-pm").style.display = "block";
   }
 }
 actualizarCampoUnidad();
@@ -359,6 +368,8 @@ async function enviar() {
     id,
     propertyManagement: VIA === "cdc" ? "Casas del Caribe" : (VIA === "otro" ? (v("pmReferente") || "Otro") : "Directo"),
     huesped, fecha,
+    horaEstimada: v("horaEstimada"),
+    emailPM: v("emailPM"),
     unidad: v("unidad"),
     contacto: v("contacto"),
     email: v("email"),
@@ -393,6 +404,7 @@ async function enviar() {
     }
     document.getElementById("form-pane").style.display = "none";
     document.getElementById("ok-pane").style.display = "block";
+    document.getElementById("link-cliente-pane").style.display = ES_VIA_ALGUIEN ? "block" : "none";
     window.scrollTo(0, 0);
   } catch (e) {
     err.textContent = "No se pudo enviar. Revisa tu conexión e intenta de nuevo.";
@@ -405,7 +417,7 @@ async function enviar() {
 
 function reiniciar() {
   ultimoLeadId = null;
-  ["huesped","unidad","contacto","email","fecha","tour","pax","edades","alergias","preferencias","notas","remitente"].forEach(id => document.getElementById(id).value = "");
+  ["huesped","unidad","contacto","email","fecha","horaEstimada","tour","pax","edades","alergias","preferencias","notas","remitente","emailPM"].forEach(id => document.getElementById(id).value = "");
   if (document.getElementById("pmReferente")) document.getElementById("pmReferente").value = "";
   document.getElementById("ok-pane").style.display = "none";
   document.getElementById("form-pane").style.display = "block";

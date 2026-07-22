@@ -210,13 +210,14 @@ function enviarConfirmacionPorCorreo(tour, detalleCliente, onSuccess) {
     body: JSON.stringify({
       action: "enviar_ticket_email",
       email,
+      emailPM: tour.emailPropertyManagement || "",
       cliente: tour.cliente || "",
       tour: ti.label.replace(/^\S+\s/, ""),
       fecha: tour.fecha || "",
       url,
     }),
   }).then(() => {
-    alert("Correo enviado a " + email + " (revisa en unos minutos que haya llegado bien).");
+    alert("Correo enviado a " + email + (tour.emailPropertyManagement ? " (con copia a " + tour.emailPropertyManagement + ")" : "") + " (revisa en unos minutos que haya llegado bien).");
     if (onSuccess) onSuccess();
   }).catch(() => {
     alert("No se pudo enviar. Revisa tu conexión e intenta de nuevo.");
@@ -367,7 +368,7 @@ function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill, forcedI
   const [tipoKey, setTipoKey] = React.useState(tourToEdit ? tourToEdit.tipo : (prefill?.tipoKey || "kayaking"));
   const tipo = TIPOS_TOUR[tipoKey];
   const [f, setF] = React.useState(() => tourToEdit ? {
-    fecha: tourToEdit.fecha, hora: tourToEdit.hora || "", puntoEncuentro: tourToEdit.puntoEncuentro || "", contactoCliente: tourToEdit.contactoCliente || "", emailCliente: tourToEdit.emailCliente || "", propertyManagement: tourToEdit.propertyManagement || "Directo", cliente: tourToEdit.cliente,
+    fecha: tourToEdit.fecha, hora: tourToEdit.hora || "", puntoEncuentro: tourToEdit.puntoEncuentro || "", contactoCliente: tourToEdit.contactoCliente || "", emailCliente: tourToEdit.emailCliente || "", emailPropertyManagement: tourToEdit.emailPropertyManagement || "", propertyManagement: tourToEdit.propertyManagement || "Directo", cliente: tourToEdit.cliente,
     pax: tourToEdit.pax || "", paxCompartido: tourToEdit.paxCompartido || "", paxSolo: tourToEdit.paxSolo || "",
     precioPax: tourToEdit.precioPax, precioSolo: tourToEdit.precioSolo || 0,
     comisionPct: tourToEdit.comisionPct, pagoGuia: tourToEdit.pagoGuia,
@@ -376,7 +377,7 @@ function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill, forcedI
     montoPagado: tourToEdit.montoPagado ?? "",
   } : {
     fecha: fechaInicial || new Date().toISOString().split("T")[0],
-    hora: "", puntoEncuentro: "", contactoCliente: "", emailCliente: "", propertyManagement: prefill?.propertyManagement || "Directo",
+    hora: prefill?.hora || "", puntoEncuentro: "", contactoCliente: "", emailCliente: "", emailPropertyManagement: prefill?.emailPropertyManagement || "", propertyManagement: prefill?.propertyManagement || "Directo",
     cliente: prefill?.cliente || "", pax: prefill?.pax || "", paxCompartido: "", paxSolo: "",
     precioPax: tipo.precioPax, precioSolo: tipo.precioSolo || 0,
     comisionPct: COMISION_DEFAULT, pagoGuia: 0,
@@ -447,6 +448,10 @@ function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill, forcedI
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "Email del cliente (opcional)"),
         React.createElement("input", { type: "email", value: f.emailCliente, onChange: e => h("emailCliente", e.target.value), style: inp, placeholder: "Ej: huesped@correo.com" })
+      ),
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Email de la propiedad/referente (opcional, recibe copia de la confirmación)"),
+        React.createElement("input", { type: "email", value: f.emailPropertyManagement, onChange: e => h("emailPropertyManagement", e.target.value), style: inp, placeholder: "Ej: diana@casasdelcaribe.com" })
       ),
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "Reserva vía"),
@@ -1004,8 +1009,8 @@ function App() {
       id: Date.now() + Math.floor(Math.random() * 1000),
       origenLeadId: lead.id,
       pendienteConfirmar: true,
-      fecha: lead.fecha, hora: "", puntoEncuentro: "",
-      contactoCliente: lead.contacto || "", emailCliente: lead.email || "",
+      fecha: lead.fecha, hora: lead.horaEstimada || "", puntoEncuentro: "",
+      contactoCliente: lead.contacto || "", emailCliente: lead.email || "", emailPropertyManagement: lead.emailPM || "",
       propertyManagement: lead.propertyManagement || "Directo",
       cliente: lead.huesped + (lead.unidad ? " (" + lead.unidad + ")" : ""),
       tipo: tipoKey, pax: lead.pax || "", paxCompartido: "", paxSolo: "",
@@ -1141,7 +1146,7 @@ function App() {
     setPanel({
       tipo: "form",
       dia: lead.fecha || (year + "-" + String(month).padStart(2, "0") + "-01"),
-      prefill: { cliente: lead.huesped + (lead.unidad ? " (" + lead.unidad + ")" : ""), pax: lead.pax || "", tipoKey: lead.tourInteres || "kayaking", notas, propertyManagement: lead.propertyManagement || "Directo" },
+      prefill: { cliente: lead.huesped + (lead.unidad ? " (" + lead.unidad + ")" : ""), pax: lead.pax || "", tipoKey: lead.tourInteres || "kayaking", notas, propertyManagement: lead.propertyManagement || "Directo", hora: lead.horaEstimada || "", emailPropertyManagement: lead.emailPM || "" },
       leadId: lead.id,
     });
   }
