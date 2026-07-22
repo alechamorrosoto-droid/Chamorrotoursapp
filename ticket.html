@@ -110,6 +110,9 @@
     gap:16px 12px;
     margin-top:6px;
   }
+  .field{
+    min-width:0;
+  }
   .field .k{
     font-size:10px;
     text-transform:uppercase;
@@ -120,6 +123,8 @@
   .field .v{
     font-size:15px;
     font-weight:500;
+    overflow-wrap:break-word;
+    word-break:break-word;
   }
   .field .v-link{
     color:var(--ink);
@@ -129,11 +134,15 @@
     display:inline-flex;
     align-items:center;
     gap:4px;
+    overflow-wrap:break-word;
+    word-break:break-word;
+    max-width:100%;
   }
   .field .v-link::after{
     content:'↗';
     font-size:11px;
     color:var(--coral);
+    flex-shrink:0;
   }
   .field .v.mono{
     font-family:'IBM Plex Mono', monospace;

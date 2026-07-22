@@ -120,16 +120,16 @@
         <div id="sin-id" class="callout rust" style="display:none;">This link seems to be missing some information. Please request a new link.</div>
 
         <div id="campos">
-          <label>Main guest name</label>
+          <label>Main guest name <span class="req">*</span></label>
           <input type="text" id="huesped" placeholder="e.g. John Smith" />
 
-          <label>Phone / WhatsApp (for day-of coordination)</label>
+          <label>Phone / WhatsApp (for day-of coordination) <span class="req">*</span></label>
           <input type="text" id="contacto" placeholder="e.g. +1 555 123 4567" />
 
-          <label>Email (optional — so we can send your confirmation)</label>
+          <label>Email <span class="req">*</span></label>
           <input type="email" id="email" placeholder="e.g. you@email.com" />
 
-          <label>Which tour would you like?</label>
+          <label>Which tour would you like? <span class="req">*</span></label>
           <select id="tour" onchange="actualizarCamposCondicionales(); actualizarPrecioEstimado(); actualizarQueTraer();">
             <option value="">Not decided yet</option>
             <option value="kayaking">Kayaking</option>
@@ -143,14 +143,14 @@
           <div id="precio-estimado" class="callout" style="display:none;"></div>
           <div id="que-traer" class="callout" style="display:none;"></div>
 
-          <label>Number of guests</label>
+          <label>Number of guests <span class="req">*</span></label>
           <input type="number" id="pax" min="1" placeholder="e.g. 4" oninput="actualizarPrecioEstimado()" />
 
-          <label>Ages of the group</label>
+          <label>Ages of the group <span class="req">*</span></label>
           <input type="text" id="edades" placeholder="e.g. 2 adults, kids age 8 and 12" />
 
           <div id="campo-nadar" style="display:none;">
-            <label>Swimming ability</label>
+            <label>Swimming ability <span class="req">*</span></label>
             <select id="nadar">
               <option value="">Select an option</option>
               <option value="Comfortable swimmer">Comfortable swimmer</option>
@@ -161,11 +161,11 @@
           </div>
 
           <div id="campo-peso" style="display:none;">
-            <label>Approximate weight of riders (helps us assign quads safely)</label>
+            <label>Approximate weight of riders (helps us assign quads safely) <span class="req">*</span></label>
             <input type="text" id="peso" placeholder="e.g. 3 around 70kg, 1 around 100kg" />
           </div>
 
-          <label>Preferred language</label>
+          <label>Preferred language <span class="req">*</span></label>
           <select id="idioma">
             <option>English</option>
             <option>Español</option>
@@ -180,8 +180,8 @@
           <label>Dietary preferences <span class="req">*</span></label>
           <input type="text" id="preferencias" placeholder="Vegetarian, gluten-free, etc." />
 
-          <label>Anything else we should know?</label>
-          <textarea id="notas" placeholder="Limited mobility, special occasion, fear of water, etc."></textarea>
+          <label>Anything else we should know? <span class="req">*</span></label>
+          <textarea id="notas" placeholder="Write &quot;None&quot; if there isn't anything else"></textarea>
 
           <div class="rule-block">
             <div class="eyebrow">Good to know</div>
@@ -254,7 +254,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="#0B5D52" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
       </div>
       <h2 class="display">You're all set</h2>
-      <p>Thank you for choosing Casas del Caribe — we're looking forward to having you on your tour.</p>
+      <p id="mensaje-agradecimiento">Thank you for booking with us — we're looking forward to having you on your tour.</p>
       <div class="ok-summary" id="ok-summary"></div>
       <svg class="ok-contour" width="160" height="14" viewBox="0 0 160 14" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block; margin:30px auto 0;">
         <path d="M2 7C14 1, 22 13, 34 7S54 1, 66 7s20 6, 32 0 20-6, 32 0 20 6, 32 0" stroke="#0B5D52" stroke-width="1.4" stroke-linecap="round"/>
@@ -278,6 +278,7 @@ if (pm === "Casas del Caribe") {
   document.getElementById("own-logo").style.display = "none";
   document.getElementById("pm-logo").style.display = "block";
   document.getElementById("brand-subtitle").style.display = "block";
+  document.getElementById("mensaje-agradecimiento").textContent = "Thank you for choosing Casas del Caribe — we're looking forward to having you on your tour.";
 }
 if (!tourId) {
   document.getElementById("sin-id").style.display = "block";
@@ -412,6 +413,56 @@ async function enviar() {
   const huesped = v("huesped");
   const alergias = v("alergias");
   const preferencias = v("preferencias");
+  if (!huesped) {
+    err.textContent = "Please fill in the main guest name.";
+    err.style.display = "block";
+    return;
+  }
+  if (!v("contacto")) {
+    err.textContent = "Please fill in a phone/WhatsApp number.";
+    err.style.display = "block";
+    return;
+  }
+  if (!v("email")) {
+    err.textContent = "Please fill in your email.";
+    err.style.display = "block";
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v("email"))) {
+    err.textContent = "That email doesn't look valid, please check it.";
+    err.style.display = "block";
+    return;
+  }
+  if (!v("tour")) {
+    err.textContent = "Please select which tour you'd like.";
+    err.style.display = "block";
+    return;
+  }
+  if (!v("pax")) {
+    err.textContent = "Please fill in the number of guests.";
+    err.style.display = "block";
+    return;
+  }
+  if (!v("edades")) {
+    err.textContent = "Please fill in the ages of the group.";
+    err.style.display = "block";
+    return;
+  }
+  if (document.getElementById("campo-nadar").style.display !== "none" && !v("nadar")) {
+    err.textContent = "Please select swimming ability.";
+    err.style.display = "block";
+    return;
+  }
+  if (document.getElementById("campo-peso").style.display !== "none" && !v("peso")) {
+    err.textContent = "Please fill in the approximate weight of riders.";
+    err.style.display = "block";
+    return;
+  }
+  if (!v("notas")) {
+    err.textContent = "Please fill in this field (write \"None\" if there isn't anything else).";
+    err.style.display = "block";
+    return;
+  }
   if (!alergias) {
     err.textContent = "Please fill in the Allergies field (write \"None known\" if that's the case).";
     err.style.display = "block";
