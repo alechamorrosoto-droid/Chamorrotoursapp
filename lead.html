@@ -74,6 +74,10 @@
     .callout ul { margin: 4px 0 0 18px; padding: 0; }
     .callout li { margin-bottom: 2px; }
     .client-link p { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 14px; max-width: none; }
+    .waiver-block { margin-top: 6px; padding-top: 18px; border-top: 1px solid var(--line); }
+    .waiver-text { font-size: 12px; color: var(--muted); line-height: 1.6; background: var(--sand); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; max-height: 130px; overflow-y: auto; }
+    .waiver-check { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; font-size: 13px; color: var(--ink); line-height: 1.5; cursor: pointer; }
+    .waiver-check input { width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; accent-color: var(--teal); }
   </style>
 </head>
 <body>
@@ -98,7 +102,7 @@
         <label>Contacto del huésped o tuyo (teléfono/WhatsApp)</label>
         <input type="text" id="contacto" placeholder="Ej: +506 8888-8888" />
 
-        <label>Email <span class="req">*</span></label>
+        <label id="label-email">Email <span class="req">*</span></label>
         <input type="email" id="email" placeholder="Ej: huesped@correo.com" />
 
         <label>Fecha tentativa del tour</label>
@@ -159,6 +163,16 @@
         <div id="bloque-email-pm" style="display:none;">
           <label>Tu correo (para que también te llegue la confirmación del tour)</label>
           <input type="email" id="emailPM" placeholder="Ej: diana@casasdelcaribe.com" />
+        </div>
+
+        <div class="waiver-block" id="bloque-waiver">
+          <div class="waiver-text">
+            Entiendo que este tour incluye actividad física y riesgos propios de la actividad (agua, terreno, animales, clima o equipo). Confirmo que la información del grupo dada arriba es correcta, que asumo esos riesgos de forma voluntaria, y libero a Chamorro Tours, sus guías y las propiedades asociadas de responsabilidad por lesión, pérdida o daño, salvo negligencia grave. Entiendo que la participación es bajo mi propio riesgo.
+          </div>
+          <label class="waiver-check">
+            <input type="checkbox" id="waiver" />
+            <span>He leído y acepto lo anterior <span class="req">*</span></span>
+          </label>
         </div>
 
         <div class="err" id="err"></div>
@@ -271,18 +285,24 @@ function actualizarCampoUnidad() {
   const bloqueRemitente = document.getElementById("bloque-remitente");
   const inputRemitente = document.getElementById("remitente");
   const textoIntro = document.getElementById("texto-intro");
+  const bloqueWaiver = document.getElementById("bloque-waiver");
+  const labelEmail = document.getElementById("label-email");
   if (ES_VIA_ALGUIEN) {
     labelHuesped.innerHTML = "Nombre del huésped / grupo <span class=\"req\">*</span>";
     label.textContent = VIA === "cdc" ? "Casa, Villa o Bungalow" : "Hotel, Villa o Bungalow";
     input.placeholder = VIA === "cdc" ? "Ej: Villa 4, Bungalow 2, Casa del Mar" : "Ej: Villa 4, Bungalow 2 o Hotel Le Cameleon";
     bloqueReferente.style.display = VIA === "otro" ? "block" : "none";
     bloqueRemitente.style.display = "block";
+    bloqueWaiver.style.display = "none";
+    labelEmail.innerHTML = "Email (opcional, el huésped lo completa después)";
   } else {
     labelHuesped.innerHTML = "Nombre completo <span class=\"req\">*</span>";
     label.textContent = "Alojamiento o punto de recogida (opcional)";
     input.placeholder = "Ej: Airbnb, hotel, o dónde te recogemos";
     bloqueReferente.style.display = "none";
     bloqueRemitente.style.display = "none";
+    bloqueWaiver.style.display = "block";
+    labelEmail.innerHTML = "Email <span class=\"req\">*</span>";
   }
   if (VIA === "cdc") {
     textoIntro.innerHTML = "Hola, equipo de Casas del Caribe. Completen los datos del huésped y coordinamos todo enseguida. Los campos con <span style=\"color:#A6402F\">*</span> son requeridos.";
@@ -341,18 +361,23 @@ async function enviar() {
     return;
   }
   const email = v("email");
-  if (!email) {
+  if (!ES_VIA_ALGUIEN && !email) {
     err.textContent = "Por favor completa el email del huésped.";
     err.style.display = "block";
     return;
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     err.textContent = "Ese email no se ve válido, revísalo.";
     err.style.display = "block";
     return;
   }
   if (VIA === "otro" && !v("pmReferente")) {
     err.textContent = "Por favor completa el nombre del hotel, Airbnb o persona.";
+    err.style.display = "block";
+    return;
+  }
+  if (!ES_VIA_ALGUIEN && !document.getElementById("waiver").checked) {
+    err.textContent = "Por favor confirma que leíste y aceptas la exención de responsabilidad.";
     err.style.display = "block";
     return;
   }
@@ -370,6 +395,8 @@ async function enviar() {
     huesped, fecha,
     horaEstimada: v("horaEstimada"),
     emailPM: v("emailPM"),
+    waiverAceptado: !ES_VIA_ALGUIEN,
+    waiverFecha: new Date().toISOString(),
     unidad: v("unidad"),
     contacto: v("contacto"),
     email: v("email"),
@@ -419,6 +446,7 @@ function reiniciar() {
   ultimoLeadId = null;
   ["huesped","unidad","contacto","email","fecha","horaEstimada","tour","pax","edades","alergias","preferencias","notas","remitente","emailPM"].forEach(id => document.getElementById(id).value = "");
   if (document.getElementById("pmReferente")) document.getElementById("pmReferente").value = "";
+  document.getElementById("waiver").checked = false;
   document.getElementById("ok-pane").style.display = "none";
   document.getElementById("form-pane").style.display = "block";
   window.scrollTo(0, 0);

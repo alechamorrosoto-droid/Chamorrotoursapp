@@ -10,6 +10,14 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #070f16; font-family: -apple-system, 'Inter', system-ui, sans-serif; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+    /* En pantallas de tablet (iPad), todo se agranda un poco automáticamente
+       — letras, botones, espacios — sin tener que ajustar cada uno a mano. */
+    @media (min-width: 700px) {
+      body { zoom: 1.25; }
+    }
+    @media (min-width: 1000px) {
+      body { zoom: 1.4; }
+    }
     input, select, button { font-family: inherit; }
     input, select, textarea { color-scheme: dark; }
     input[type="date"]::-webkit-datetime-edit,
@@ -377,7 +385,7 @@ function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill, forcedI
     montoPagado: tourToEdit.montoPagado ?? "",
   } : {
     fecha: fechaInicial || new Date().toISOString().split("T")[0],
-    hora: prefill?.hora || "", puntoEncuentro: "", contactoCliente: "", emailCliente: "", emailPropertyManagement: prefill?.emailPropertyManagement || "", propertyManagement: prefill?.propertyManagement || "Directo",
+    hora: prefill?.hora || "", puntoEncuentro: "", contactoCliente: prefill?.contactoCliente || "", emailCliente: prefill?.emailCliente || "", emailPropertyManagement: prefill?.emailPropertyManagement || "", propertyManagement: prefill?.propertyManagement || "Directo",
     cliente: prefill?.cliente || "", pax: prefill?.pax || "", paxCompartido: "", paxSolo: "",
     precioPax: tipo.precioPax, precioSolo: tipo.precioSolo || 0,
     comisionPct: COMISION_DEFAULT, pagoGuia: 0,
@@ -681,11 +689,13 @@ function LeadForm({ onSave, onCancel, leadToEdit, onConvert, onDelete }) {
     tourInteres: leadToEdit.tourInteres || "", pax: leadToEdit.pax || "", fecha: leadToEdit.fecha || "",
     contacto: leadToEdit.contacto || "", notas: leadToEdit.notas || "", estado: leadToEdit.estado || "Pendiente",
     edades: leadToEdit.edades || "", alergias: leadToEdit.alergias || "", preferencias: leadToEdit.preferencias || "",
+    email: leadToEdit.email || "", horaEstimada: leadToEdit.horaEstimada || "", emailPM: leadToEdit.emailPM || "",
   } : {
     propertyManagement: "Casas del Caribe", huesped: "", unidad: "",
     tourInteres: "", pax: "", fecha: new Date().toISOString().split("T")[0],
     contacto: "", notas: "", estado: "Pendiente",
     edades: "", alergias: "", preferencias: "",
+    email: "", horaEstimada: "", emailPM: "",
   });
   const h = (k, v) => setF(p => ({ ...p, [k]: v }));
 
@@ -739,6 +749,20 @@ function LeadForm({ onSave, onCancel, leadToEdit, onConvert, onDelete }) {
     React.createElement("div", { style: { marginBottom: 16 } },
       React.createElement("label", { style: lbl }, "Contacto del PM (WhatsApp / Email)"),
       React.createElement("input", { type: "text", value: f.contacto, onChange: e => h("contacto", e.target.value), style: inp, placeholder: "El PM es el intermediario, no tienes el del cliente" })
+    ),
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 16, marginBottom: 16 } },
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Email del huésped"),
+        React.createElement("input", { type: "email", value: f.email, onChange: e => h("email", e.target.value), style: inp, placeholder: "Ej: huesped@correo.com" })
+      ),
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Hora estimada"),
+        React.createElement("input", { type: "time", value: f.horaEstimada, onChange: e => h("horaEstimada", e.target.value), style: inp })
+      )
+    ),
+    React.createElement("div", { style: { marginBottom: 16 } },
+      React.createElement("label", { style: lbl }, "Email de la propiedad/referente (opcional)"),
+      React.createElement("input", { type: "email", value: f.emailPM, onChange: e => h("emailPM", e.target.value), style: inp, placeholder: "Ej: diana@casasdelcaribe.com" })
     ),
     React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 16, marginBottom: 16 } },
       React.createElement("div", null,
@@ -820,6 +844,8 @@ function LeadsView({ leads, onAdd, onOpen, onClose, onSync }) {
             React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#e8f4f8" } }, l.huesped || "(sin nombre)"),
             React.createElement("div", { style: { fontSize: 11, color: "#7ec8e3", marginTop: 2 } }, l.propertyManagement + (l.unidad ? " · " + l.unidad : "")),
             React.createElement("div", { style: { fontSize: 11, color: "#475569", marginTop: 2 } }, (l.fecha || "—") + (l.tourInteres ? " · " + (TIPOS_TOUR[l.tourInteres]?.label || l.tourInteres) : "")),
+            l.contacto ? React.createElement("div", { style: { fontSize: 11, color: "#94a3b8", marginTop: 2 } }, "📞 " + l.contacto) : null,
+            l.email ? React.createElement("div", { style: { fontSize: 11, color: "#94a3b8", marginTop: 2 } }, "✉️ " + l.email) : null,
             l.alergias ? React.createElement("div", { style: { fontSize: 11, color: "#f59e0b", marginTop: 3, fontWeight: 600 } }, "🚨 " + l.alergias) : null
           ),
           React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: LEAD_ESTADO_COLOR[l.estado] || "#7ec8e3", background: (LEAD_ESTADO_COLOR[l.estado] || "#7ec8e3") + "20", border: "1px solid " + (LEAD_ESTADO_COLOR[l.estado] || "#7ec8e3") + "50", borderRadius: 6, padding: "3px 7px", whiteSpace: "nowrap" } }, l.estado)
@@ -1146,7 +1172,7 @@ function App() {
     setPanel({
       tipo: "form",
       dia: lead.fecha || (year + "-" + String(month).padStart(2, "0") + "-01"),
-      prefill: { cliente: lead.huesped + (lead.unidad ? " (" + lead.unidad + ")" : ""), pax: lead.pax || "", tipoKey: lead.tourInteres || "kayaking", notas, propertyManagement: lead.propertyManagement || "Directo", hora: lead.horaEstimada || "", emailPropertyManagement: lead.emailPM || "" },
+      prefill: { cliente: lead.huesped + (lead.unidad ? " (" + lead.unidad + ")" : ""), pax: lead.pax || "", tipoKey: lead.tourInteres || "kayaking", notas, propertyManagement: lead.propertyManagement || "Directo", hora: lead.horaEstimada || "", emailPropertyManagement: lead.emailPM || "", emailCliente: lead.email || "", contactoCliente: lead.contacto || "" },
       leadId: lead.id,
     });
   }
