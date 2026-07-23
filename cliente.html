@@ -148,6 +148,8 @@
 
           <label>Ages of the group <span class="req">*</span></label>
           <input type="text" id="edades" placeholder="e.g. 2 adults, kids age 8 and 12" />
+          <p style="font-size:12px; color:var(--muted); margin-top:6px;">Children older than 5 pay the full/regular price.</p>
+          <p id="nota-edad-atv" style="display:none; font-size:12px; color:#A6402F; font-weight:600; margin-top:4px;">⚠️ For ATV tours, children must be older than 6 to participate.</p>
 
           <div id="campo-nadar" style="display:none;">
             <label>Swimming ability <span class="req">*</span></label>
@@ -390,6 +392,7 @@ function actualizarCamposCondicionales() {
   const tour = v("tour");
   document.getElementById("campo-nadar").style.display = TOURS_AGUA.includes(tour) ? "block" : "none";
   document.getElementById("campo-peso").style.display = TOURS_ATV.includes(tour) ? "block" : "none";
+  document.getElementById("nota-edad-atv").style.display = TOURS_ATV.includes(tour) ? "block" : "none";
 }
 
 const QUE_TRAER = {
