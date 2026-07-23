@@ -12,10 +12,10 @@
     body { background: #070f16; font-family: -apple-system, 'Inter', system-ui, sans-serif; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
     /* En pantallas de tablet (iPad), todo se agranda un poco automáticamente
        — letras, botones, espacios — sin tener que ajustar cada uno a mano. */
-    @media (min-width: 700px) {
+    @media (min-width: 700px) and (hover: none) and (pointer: coarse) {
       body { zoom: 1.25; }
     }
-    @media (min-width: 1000px) {
+    @media (min-width: 1000px) and (hover: none) and (pointer: coarse) {
       body { zoom: 1.4; }
     }
     input, select, button { font-family: inherit; }
@@ -80,6 +80,19 @@ function syncTourEliminado(id) {
 }
 function syncLeadEliminado(id) {
   syncConReintento({ action: "eliminar_lead", id }, "eliminar lead");
+  verificarLeadEliminado(id);
+}
+async function verificarLeadEliminado(id, intentos = 4) {
+  for (let i = 0; i < intentos; i++) {
+    await new Promise(r => setTimeout(r, 1500 * (i + 1)));
+    try {
+      const leads = await traerLeadsDeSheets();
+      if (!leads.some(l => String(l.id) === String(id))) return; // confirmado, ya no está
+    } catch (e) { /* seguimos intentando */ }
+  }
+  // Después de varios intentos sigue apareciendo en el servidor: avisamos,
+  // en vez de dejar que reaparezca en silencio la próxima vez que sincronices.
+  alert("No se pudo confirmar que el lead se borró del servidor. Puede reaparecer la próxima vez que sincronices — intenta borrarlo de nuevo o revisa tu conexión.");
 }
 async function traerLeadsDeSheets() {
   const res = await fetch(SHEET_SYNC_URL + "?action=leads", { method: "GET" });
@@ -181,7 +194,9 @@ function enviarConfirmacionCliente(tour, detalleCliente) {
   if (detalleCliente && detalleCliente.Idioma) params.set("idioma", detalleCliente.Idioma);
   const url = "https://alechamorrosoto-droid.github.io/Chamorrotoursapp/ticket.html?" + params.toString();
   const mensaje = "🌊 ¡Tu tour con Chamorro Tours está confirmado! Aquí tienes todos los detalles y tu código QR de acceso (tu guía lo va a necesitar el día del tour):\n\n" + url;
-  const waUrl = "https://wa.me/?text=" + encodeURIComponent(mensaje);
+  const contactoCrudo = tour.contactoCliente || (detalleCliente && detalleCliente.Contacto) || "";
+  const contactoLimpio = contactoCrudo.replace(/[^\d]/g, "");
+  const waUrl = (contactoLimpio ? "https://wa.me/" + contactoLimpio : "https://wa.me/") + "?text=" + encodeURIComponent(mensaje);
   window.open(waUrl, "_blank");
   return url;
 }
@@ -432,7 +447,7 @@ function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill, forcedI
       ),
       tipo.duracion ? React.createElement("div", { style: { fontSize: 11, color: "#475569", marginTop: 6 } }, "⏱ " + tipo.duracion) : null
     ),
-    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 14, marginBottom: 16 } },
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 12, marginBottom: 10 } },
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "Fecha"),
         React.createElement("input", { type: "date", value: f.fecha, onChange: e => h("fecha", e.target.value), style: inp })
@@ -440,7 +455,9 @@ function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill, forcedI
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "Hora del tour"),
         React.createElement("input", { type: "time", value: f.hora, onChange: e => h("hora", e.target.value), style: inp })
-      ),
+      )
+    ),
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 12, marginBottom: 10 } },
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "Cliente"),
         React.createElement("input", { type: "text", value: f.cliente, onChange: e => h("cliente", e.target.value), style: inp, placeholder: "Ej: Casas del Caribe" })
@@ -448,7 +465,9 @@ function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill, forcedI
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "Punto de encuentro / pickup"),
         React.createElement("input", { type: "text", value: f.puntoEncuentro, onChange: e => h("puntoEncuentro", e.target.value), style: inp, placeholder: "Ej: Lobby Casas del Caribe" })
-      ),
+      )
+    ),
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 12, marginBottom: 10 } },
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "Contacto del cliente (opcional)"),
         React.createElement("input", { type: "text", value: f.contactoCliente, onChange: e => h("contactoCliente", e.target.value), style: inp, placeholder: "Ej: +506 8888-8888" })
@@ -456,7 +475,9 @@ function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill, forcedI
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "Email del cliente (opcional)"),
         React.createElement("input", { type: "email", value: f.emailCliente, onChange: e => h("emailCliente", e.target.value), style: inp, placeholder: "Ej: huesped@correo.com" })
-      ),
+      )
+    ),
+    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 } },
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "Email de la propiedad/referente (opcional, recibe copia de la confirmación)"),
         React.createElement("input", { type: "email", value: f.emailPropertyManagement, onChange: e => h("emailPropertyManagement", e.target.value), style: inp, placeholder: "Ej: diana@casasdelcaribe.com" })
@@ -577,12 +598,14 @@ function TourDetalle({ tour, onClose, onDelete, onEdit, detalleCliente, onVerDet
           tipoInfo.duracion ? React.createElement("span", { style: { fontSize: 11, color: "#475569" } }, "· " + tipoInfo.duracion) : null
         ),
         React.createElement("div", { style: { fontSize: 19, fontWeight: 800, color: "#e8f4f8" } }, tour.cliente),
+        tour.propertyManagement && tour.propertyManagement !== "Directo" ? React.createElement("div", { style: { fontSize: 11.5, color: "#a78bfa", marginTop: 2, fontWeight: 600 } }, "🏨 Vía: " + tour.propertyManagement) : null,
         React.createElement("div", { style: { fontSize: 13, color: "#7ec8e3", marginTop: 3 } }, paxText + " · " + tour.guiaNombre + " · " + tour.metodoPago),
         (tour.hora || tour.puntoEncuentro) ? React.createElement("div", { style: { fontSize: 12, color: "#94a3b8", marginTop: 4 } },
           [tour.hora ? "🕐 " + tour.hora : "", tour.puntoEncuentro ? "📍 " + tour.puntoEncuentro : ""].filter(Boolean).join("  ·  ")
         ) : null,
         tour.contactoCliente ? React.createElement("div", { style: { fontSize: 12, color: "#94a3b8", marginTop: 2 } }, "📞 " + tour.contactoCliente) : null,
         tour.emailCliente ? React.createElement("div", { style: { fontSize: 12, color: "#94a3b8", marginTop: 2 } }, "✉️ " + tour.emailCliente) : null,
+        tour.emailPropertyManagement ? React.createElement("div", { style: { fontSize: 12, color: "#94a3b8", marginTop: 2 } }, "🏠 " + tour.emailPropertyManagement + " (recibe copia)") : null,
         React.createElement("div", { style: { marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
           React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: ESTADO_PAGO_COLOR[tour.estadoPago || "Pendiente"], background: ESTADO_PAGO_COLOR[tour.estadoPago || "Pendiente"] + "20", border: "1px solid " + ESTADO_PAGO_COLOR[tour.estadoPago || "Pendiente"] + "50", borderRadius: 6, padding: "3px 8px" } }, "💵 " + (tour.estadoPago || "Pendiente")),
           (tour.estadoPago === "Parcial" && tour.montoPendiente > 0) ? React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: "#f59e0b" } }, "Falta cobrar: " + fmt(tour.montoPendiente)) : null,
@@ -616,6 +639,7 @@ function TourDetalle({ tour, onClose, onDelete, onEdit, detalleCliente, onVerDet
         ...[
           ["👤 Huésped", detalleCliente.Huesped],
           ["📞 Contacto", detalleCliente.Contacto],
+          ["✉️ Email", detalleCliente.Email],
           ["🎯 Tour de interés", TIPOS_TOUR[detalleCliente.TourInteres]?.label || detalleCliente.TourInteres],
           ["👥 Pax", detalleCliente.Pax],
           ["🎂 Edades", detalleCliente.Edades],
@@ -709,9 +733,9 @@ function LeadForm({ onSave, onCancel, leadToEdit, onConvert, onDelete }) {
     onSave({ ...f, propertyManagement, idioma: idiomaFinal, id: leadToEdit ? leadToEdit.id : Date.now(), pax: Number(f.pax) || 0 });
   }
 
-  return React.createElement("div", { style: { padding: 20 } },
-    React.createElement("p", { style: { color: "#7ec8e3", fontWeight: 700, marginBottom: 14, fontSize: 13, letterSpacing: 1, textTransform: "uppercase" } }, leadToEdit ? "✏️ Editar Lead" : "+ Nuevo Lead"),
-    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 14, marginBottom: 16 } },
+  return React.createElement("div", { style: { padding: 18 } },
+    React.createElement("p", { style: { color: "#7ec8e3", fontWeight: 700, marginBottom: 12, fontSize: 13, letterSpacing: 1, textTransform: "uppercase" } }, leadToEdit ? "✏️ Editar Lead" : "+ Nuevo Lead"),
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 12, marginBottom: 10 } },
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "Property Management"),
         React.createElement("select", { value: pm, onChange: e => setPm(e.target.value), style: inp },
@@ -723,7 +747,9 @@ function LeadForm({ onSave, onCancel, leadToEdit, onConvert, onDelete }) {
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "Huésped / Grupo"),
         React.createElement("input", { type: "text", value: f.huesped, onChange: e => h("huesped", e.target.value), style: inp, placeholder: "Nombre del huésped" })
-      ),
+      )
+    ),
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 12, marginBottom: 10 } },
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "Villa / Unidad (opcional)"),
         React.createElement("input", { type: "text", value: f.unidad, onChange: e => h("unidad", e.target.value), style: inp, placeholder: "Ej: Villa 4" })
@@ -733,7 +759,7 @@ function LeadForm({ onSave, onCancel, leadToEdit, onConvert, onDelete }) {
         React.createElement("input", { type: "date", value: f.fecha, onChange: e => h("fecha", e.target.value), style: inp })
       )
     ),
-    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 16, marginBottom: 16 } },
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 12, marginBottom: 10 } },
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "Tour de interés"),
         React.createElement("select", { value: f.tourInteres, onChange: e => h("tourInteres", e.target.value), style: inp },
@@ -746,11 +772,17 @@ function LeadForm({ onSave, onCancel, leadToEdit, onConvert, onDelete }) {
         React.createElement("input", { type: "number", value: f.pax, onChange: e => h("pax", e.target.value), style: inp })
       )
     ),
-    React.createElement("div", { style: { marginBottom: 16 } },
-      React.createElement("label", { style: lbl }, "Contacto del PM (WhatsApp / Email)"),
-      React.createElement("input", { type: "text", value: f.contacto, onChange: e => h("contacto", e.target.value), style: inp, placeholder: "El PM es el intermediario, no tienes el del cliente" })
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 12, marginBottom: 10 } },
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Contacto del PM (WhatsApp / Email)"),
+        React.createElement("input", { type: "text", value: f.contacto, onChange: e => h("contacto", e.target.value), style: inp, placeholder: "El PM es el intermediario" })
+      ),
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "Email de la propiedad (opcional)"),
+        React.createElement("input", { type: "email", value: f.emailPM, onChange: e => h("emailPM", e.target.value), style: inp, placeholder: "Ej: diana@casasdelcaribe.com" })
+      )
     ),
-    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 16, marginBottom: 16 } },
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 12, marginBottom: 10 } },
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "Email del huésped"),
         React.createElement("input", { type: "email", value: f.email, onChange: e => h("email", e.target.value), style: inp, placeholder: "Ej: huesped@correo.com" })
@@ -760,11 +792,7 @@ function LeadForm({ onSave, onCancel, leadToEdit, onConvert, onDelete }) {
         React.createElement("input", { type: "time", value: f.horaEstimada, onChange: e => h("horaEstimada", e.target.value), style: inp })
       )
     ),
-    React.createElement("div", { style: { marginBottom: 16 } },
-      React.createElement("label", { style: lbl }, "Email de la propiedad/referente (opcional)"),
-      React.createElement("input", { type: "email", value: f.emailPM, onChange: e => h("emailPM", e.target.value), style: inp, placeholder: "Ej: diana@casasdelcaribe.com" })
-    ),
-    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 16, marginBottom: 16 } },
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 12, marginBottom: 10 } },
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "Idioma"),
         React.createElement("select", { value: idioma, onChange: e => setIdioma(e.target.value), style: inp },
@@ -778,7 +806,7 @@ function LeadForm({ onSave, onCancel, leadToEdit, onConvert, onDelete }) {
         React.createElement("input", { type: "text", value: f.edades, onChange: e => h("edades", e.target.value), style: inp, placeholder: "Ej: 2 adultos, niño 8 años" })
       )
     ),
-    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 16, marginBottom: 16 } },
+    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 12, marginBottom: 10 } },
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "🚨 Alergias"),
         React.createElement("input", { type: "text", value: f.alergias, onChange: e => h("alergias", e.target.value), style: { ...inp, border: f.alergias ? "1px solid #f59e0b" : inp.border }, placeholder: "Ninguna conocida" })
@@ -788,22 +816,24 @@ function LeadForm({ onSave, onCancel, leadToEdit, onConvert, onDelete }) {
         React.createElement("input", { type: "text", value: f.preferencias, onChange: e => h("preferencias", e.target.value), style: inp, placeholder: "Vegetariano, sin gluten, etc." })
       )
     ),
-    leadToEdit ? React.createElement("div", { style: { marginBottom: 16 } },
+    leadToEdit ? React.createElement("div", { style: { marginBottom: 10 } },
       React.createElement("label", { style: lbl }, "Estado"),
       React.createElement("select", { value: f.estado, onChange: e => h("estado", e.target.value), style: inp },
         ...LEAD_ESTADOS.map(e => React.createElement("option", { key: e }, e))
       )
     ) : null,
-    React.createElement("div", { style: { marginBottom: 16 } },
+    React.createElement("div", { style: { marginBottom: 10 } },
       React.createElement("label", { style: lbl }, "Notas"),
-      React.createElement("textarea", { value: f.notas, onChange: e => h("notas", e.target.value), style: { ...inp, minHeight: 70, resize: "vertical" }, placeholder: "Horario preferido, alergias, idioma, etc." })
+      React.createElement("textarea", { value: f.notas, onChange: e => h("notas", e.target.value), style: { ...inp, minHeight: 55, resize: "vertical" }, placeholder: "Horario preferido, alergias, idioma, etc." })
     ),
     React.createElement("div", { style: { display: "flex", gap: 10 } },
       React.createElement("button", { onClick: save, style: { flex: 1, background: "linear-gradient(135deg,#0ea5e9,#0369a1)", color: "#fff", border: "none", borderRadius: 8, padding: 12, fontWeight: 700, cursor: "pointer", fontSize: 14 } }, leadToEdit ? "Guardar Cambios" : "Guardar Lead"),
       React.createElement("button", { onClick: onCancel, style: { flex: 1, background: "transparent", color: "#7ec8e3", border: "1px solid #1e4060", borderRadius: 8, padding: 12, cursor: "pointer", fontSize: 14 } }, "Cancelar")
     ),
     leadToEdit ? React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 10 } },
-      React.createElement("button", { onClick: () => onConvert(leadToEdit), style: { flex: 1, background: "transparent", border: "1px solid #4ade80", color: "#4ade80", borderRadius: 8, padding: 10, cursor: "pointer", fontSize: 13 } }, "🌊 Convertir a Tour"),
+      leadToEdit.estado === "Convertido"
+        ? React.createElement("button", { onClick: () => { if (confirm("Este lead ya se convirtió a un tour antes (automático o a mano). ¿Seguro que quieres crear OTRO tour para el mismo lead? Esto puede duplicar la reserva.")) onConvert(leadToEdit); }, style: { flex: 1, background: "transparent", border: "1px dashed #f59e0b", color: "#f59e0b", borderRadius: 8, padding: 10, cursor: "pointer", fontSize: 12 } }, "✓ Ya convertido — crear otro de todas formas")
+        : React.createElement("button", { onClick: () => onConvert(leadToEdit), style: { flex: 1, background: "transparent", border: "1px solid #4ade80", color: "#4ade80", borderRadius: 8, padding: 10, cursor: "pointer", fontSize: 13 } }, "🌊 Convertir a Tour"),
       React.createElement("button", { onClick: () => { if (confirm("¿Eliminar este lead?")) onDelete(leadToEdit.id); }, style: { flex: 1, background: "transparent", border: "1px solid #7f1d1d", color: "#f87171", borderRadius: 8, padding: 10, cursor: "pointer", fontSize: 13 } }, "🗑 Eliminar")
     ) : null,
     leadToEdit ? React.createElement("button", { onClick: () => compartirLinkCliente({ id: leadToEdit.id, cliente: leadToEdit.huesped }), style: { width: "100%", marginTop: 10, background: "#0a1e2a", border: "1px solid #0ea5e9", color: "#7ec8e3", borderRadius: 8, padding: 11, cursor: "pointer", fontSize: 13, fontWeight: 700 } }, "📩 Pedirle datos al cliente (vía PM)") : null
@@ -846,6 +876,9 @@ function LeadsView({ leads, onAdd, onOpen, onClose, onSync }) {
             React.createElement("div", { style: { fontSize: 11, color: "#475569", marginTop: 2 } }, (l.fecha || "—") + (l.tourInteres ? " · " + (TIPOS_TOUR[l.tourInteres]?.label || l.tourInteres) : "")),
             l.contacto ? React.createElement("div", { style: { fontSize: 11, color: "#94a3b8", marginTop: 2 } }, "📞 " + l.contacto) : null,
             l.email ? React.createElement("div", { style: { fontSize: 11, color: "#94a3b8", marginTop: 2 } }, "✉️ " + l.email) : null,
+            l.horaEstimada ? React.createElement("div", { style: { fontSize: 11, color: "#94a3b8", marginTop: 2 } }, "🕐 " + l.horaEstimada) : null,
+            l.emailPM ? React.createElement("div", { style: { fontSize: 11, color: "#94a3b8", marginTop: 2 } }, "🏠 " + l.emailPM) : null,
+            l.waiverAceptado === "Sí" ? React.createElement("div", { style: { fontSize: 10.5, color: "#4ade80", marginTop: 3, fontWeight: 600 } }, "✅ Waiver aceptado") : null,
             l.alergias ? React.createElement("div", { style: { fontSize: 11, color: "#f59e0b", marginTop: 3, fontWeight: 600 } }, "🚨 " + l.alergias) : null
           ),
           React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: LEAD_ESTADO_COLOR[l.estado] || "#7ec8e3", background: (LEAD_ESTADO_COLOR[l.estado] || "#7ec8e3") + "20", border: "1px solid " + (LEAD_ESTADO_COLOR[l.estado] || "#7ec8e3") + "50", borderRadius: 6, padding: "3px 7px", whiteSpace: "nowrap" } }, l.estado)
@@ -976,6 +1009,10 @@ function App() {
     return meses[key] ? key : Object.keys(meses)[0];
   });
   const [panel, setPanel] = React.useState(null);
+  React.useEffect(() => {
+    document.body.style.overflow = panel ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [panel]);
   const [leads, setLeads] = React.useState(() => {
     try { const s = localStorage.getItem("chamorro_leads_data"); return s ? JSON.parse(s) : []; } catch { return []; }
   });
@@ -1032,7 +1069,7 @@ function App() {
     const tipoKey = TIPOS_TOUR[lead.tourInteres] ? lead.tourInteres : "kayaking";
     const tipo = TIPOS_TOUR[tipoKey];
     const tour = {
-      id: Date.now() + Math.floor(Math.random() * 1000),
+      id: lead.id,
       origenLeadId: lead.id,
       pendienteConfirmar: true,
       fecha: lead.fecha, hora: lead.horaEstimada || "", puntoEncuentro: "",
@@ -1277,7 +1314,7 @@ function App() {
     // PANEL
     panel ? React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "flex-end" } },
       React.createElement("div", { style: { position: "absolute", inset: 0, background: "#000000aa" }, onClick: () => setPanel(null) }),
-      React.createElement("div", { style: { position: "relative", zIndex: 51, width: "100%", maxHeight: "90vh", background: "#0a1a24", borderTop: "1px solid #1e3a4a", borderRadius: "18px 18px 0 0", overflowY: "auto" } },
+      React.createElement("div", { style: { position: "relative", zIndex: 51, width: "100%", maxHeight: "95vh", background: "#0a1a24", borderTop: "1px solid #1e3a4a", borderRadius: "18px 18px 0 0", overflowY: "auto", WebkitOverflowScrolling: "touch" } },
         React.createElement("div", { style: { width: 36, height: 4, background: "#1e3a4a", borderRadius: 2, margin: "12px auto 4px" } }),
         panel.tipo === "detalle" ? React.createElement(TourDetalle, { tour: panel.tour, onClose: () => setPanel(null), onDelete: deleteTour, onEdit: t => setPanel({ tipo: "form", dia: t.fecha, tour: t }),
           detalleCliente: detallesCliente.filter(d => String(d.TourId) === String(panel.tour.id)).sort((a,b) => String(b.Enviado).localeCompare(String(a.Enviado)))[0] || null,

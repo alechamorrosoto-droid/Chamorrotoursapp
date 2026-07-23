@@ -47,7 +47,9 @@
     label .req { color: var(--rust); }
 
     input, select, textarea { width: 100%; background: var(--sand); border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; color: var(--ink); font-size: 15px; font-family: inherit; outline: none; transition: border-color 0.15s; box-sizing: border-box; }
-    input[type="date"] { -webkit-appearance: none; appearance: none; }
+    @supports (-webkit-touch-callout: none) {
+      input[type="date"] { -webkit-appearance: none; appearance: none; }
+    }
     input:focus, select:focus, textarea:focus { border-color: var(--teal); }
     textarea { min-height: 80px; resize: vertical; }
 
