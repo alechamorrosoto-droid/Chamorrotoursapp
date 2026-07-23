@@ -166,7 +166,6 @@
             <option value="Sabe nadar bien">Sabe nadar bien</option>
             <option value="Algo de experiencia">Algo de experiencia</option>
             <option value="No sabe nadar">No sabe nadar</option>
-            <option value="Prefiere no decir">Prefiere no decir</option>
           </select>
         </div>
 
@@ -575,15 +574,11 @@ async function enviar() {
       body: JSON.stringify(lead),
     });
 
-    btn.textContent = "Confirmando...";
-    const confirmado = await confirmarEnvio(id);
-
+    // Mostramos la confirmación de inmediato — no hacemos esperar al
+    // huésped varios segundos para verificar; eso se hace aparte, en
+    // segundo plano, sin bloquear la pantalla.
     const okMsg = document.getElementById("ok-msg");
-    if (confirmado) {
-      okMsg.textContent = "Gracias. Alejandro recibirá la información y se pondrá en contacto para coordinar el tour.";
-    } else {
-      okMsg.textContent = "Tu solicitud se envió, pero no pudimos confirmar que llegara a la hoja de Alejandro. Por favor avísale directamente por WhatsApp para asegurar que la vea.";
-    }
+    okMsg.textContent = "Gracias. Alejandro recibirá la información y se pondrá en contacto para coordinar el tour.";
     document.getElementById("form-pane").style.display = "none";
     document.getElementById("ok-pane").style.display = "block";
     document.getElementById("link-cliente-pane").style.display = ES_VIA_ALGUIEN ? "block" : "none";
@@ -594,6 +589,12 @@ async function enviar() {
         : "No pusiste un número de contacto, así que WhatsApp te va a pedir elegir tú mismo a quién mandárselo.";
     }
     window.scrollTo(0, 0);
+
+    confirmarEnvio(id).then(confirmado => {
+      if (!confirmado) {
+        okMsg.textContent = "Tu solicitud se envió, pero no pudimos confirmar que llegara a la hoja de Alejandro. Por favor avísale directamente por WhatsApp para asegurar que la vea.";
+      }
+    });
   } catch (e) {
     err.textContent = "No se pudo enviar. Revisa tu conexión e intenta de nuevo.";
     err.style.display = "block";

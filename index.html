@@ -16,10 +16,10 @@
     /* En pantallas de tablet (iPad), todo se agranda un poco automáticamente
        — letras, botones, espacios — sin tener que ajustar cada uno a mano. */
     @media (min-width: 700px) and (hover: none) and (pointer: coarse) {
-      body { zoom: 1.25; }
+      body { zoom: 1.12; }
     }
     @media (min-width: 1000px) and (hover: none) and (pointer: coarse) {
-      body { zoom: 1.4; }
+      body { zoom: 1.2; }
     }
     input, select, button { font-family: inherit; }
     input, select, textarea { color-scheme: dark; }
@@ -812,8 +812,7 @@ function LeadForm({ onSave, onCancel, leadToEdit, onConvert, onDelete }) {
         React.createElement("option", { value: "" }, "Selecciona una opción"),
         React.createElement("option", { value: "Sabe nadar bien" }, "Sabe nadar bien"),
         React.createElement("option", { value: "Algo de experiencia" }, "Algo de experiencia"),
-        React.createElement("option", { value: "No sabe nadar" }, "No sabe nadar"),
-        React.createElement("option", { value: "Prefiere no decir" }, "Prefiere no decir")
+        React.createElement("option", { value: "No sabe nadar" }, "No sabe nadar")
       )
     ) : null,
     React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 12, marginBottom: 10 } },
@@ -1084,6 +1083,13 @@ function App() {
   React.useEffect(() => {
     traerLeadsDeSheets().then(mergeLeadsRemotos).catch(() => {});
     traerDetallesClienteDeSheets().then(mergeDetallesCliente).catch(() => {});
+    // Revisa solo, cada minuto, si hay leads o formularios de cliente nuevos
+    // — para no depender siempre de tocar "Actualizar" a mano.
+    const intervalo = setInterval(() => {
+      traerLeadsDeSheets().then(mergeLeadsRemotos).catch(() => {});
+      traerDetallesClienteDeSheets().then(mergeDetallesCliente).catch(() => {});
+    }, 60000);
+    return () => clearInterval(intervalo);
   }, []);
 
   const { year, month, label, tours } = meses[mesActivo];
@@ -1303,7 +1309,7 @@ function App() {
   return React.createElement("div", { style: { minHeight: "100vh", background: "#070f16", color: "#e8f4f8", display: "flex", flexDirection: "column" } },
     // HEADER
     React.createElement("div", { style: { background: "#0a1a24", borderBottom: "1px solid #1e3a4a" } },
-     React.createElement("div", { style: { padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, maxWidth: 640, margin: "0 auto", width: "100%" } },
+     React.createElement("div", { style: { padding: "10px 16px", display: "flex", alignItems: "center", gap: 12, maxWidth: 640, margin: "0 auto", width: "100%" } },
       React.createElement("div", { style: { width: 38, height: 38, borderRadius: 9, background: "linear-gradient(135deg,#0ea5e9,#0369a1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 } }, "🌊"),
       React.createElement("div", { style: { flex: 1 } },
         React.createElement("div", { style: { fontWeight: 800, fontSize: 16 } }, "Chamorro Tours"),
@@ -1341,18 +1347,18 @@ function App() {
       ...(mostrarAnual
         ? [ ["Ingreso "+year,fmt(totalesAnio.ingreso),"#7ec8e3"], ["Gastos "+year,fmt(totalesAnio.gastoTotal),"#f59e0b"], ["Ganancia "+year,fmt(totalesAnio.ganancia),totalesAnio.ganancia>=0?"#4ade80":"#f87171"], ["Pax "+year,totalesAnio.pax||"—","#e8f4f8"] ]
         : [ ["Ingreso",fmt(totales.ingreso),"#7ec8e3"], ["Gastos",fmt(totales.gastoTotal),"#f59e0b"], ["Ganancia",fmt(totales.ganancia),totales.ganancia>=0?"#4ade80":"#f87171"], ["Pax",totales.pax||"—","#e8f4f8"] ]
-      ).map(([l,v,c]) => React.createElement("div", { key: l, style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 10, padding: "10px 8px", textAlign: "center" } },
-          React.createElement("div", { style: { fontSize: 10, color: "#475569", marginBottom: 4 } }, l),
-          React.createElement("div", { style: { fontSize: 15, fontWeight: 800, color: c } }, v)
+      ).map(([l,v,c]) => React.createElement("div", { key: l, style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 9, padding: "7px 8px", textAlign: "center" } },
+          React.createElement("div", { style: { fontSize: 9.5, color: "#475569", marginBottom: 2 } }, l),
+          React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: c } }, v)
         ))
     ),
     // CALENDARIO
-    React.createElement("div", { style: { flex: 1, padding: "0 16px 20px", maxWidth: 640, margin: "0 auto", width: "100%" } },
+    React.createElement("div", { style: { flex: 1, padding: "0 16px 12px", maxWidth: 640, margin: "0 auto", width: "100%" } },
       React.createElement("div", { style: { textAlign: "center", fontWeight: 800, fontSize: 16, color: "#e8f4f8", marginBottom: 10 } }, label),
-      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4, marginBottom: 4 } },
-        ...DIAS.map(d => React.createElement("div", { key: d, style: { textAlign: "center", fontSize: 11, color: "#334155", fontWeight: 700, padding: "4px 0" } }, d))
+      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 3, marginBottom: 3 } },
+        ...DIAS.map(d => React.createElement("div", { key: d, style: { textAlign: "center", fontSize: 10.5, color: "#334155", fontWeight: 700, padding: "2px 0" } }, d))
       ),
-      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4 } },
+      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 3 } },
         ...cells.map((dia, i) => {
           if (!dia) return React.createElement("div", { key: i });
           const ts = toursPorDia[dia] || [];
@@ -1361,26 +1367,26 @@ function App() {
           const esDiaHoy = esHoy(dia);
           return React.createElement("div", {
             key: i, onClick: () => clickDia(dia),
-            style: { minHeight: 72, background: tieneTour ? "linear-gradient(145deg,#0c2d45,#0f3555)" : esDiaHoy ? "#0f2535" : "#0a1a24", border: tieneTour ? "1.5px solid #0ea5e9" : esDiaHoy ? "1.5px solid #334155" : "1px solid #12293a", borderRadius: 10, padding: "7px 6px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 3, position: "relative" }
+            style: { minHeight: 56, background: tieneTour ? "linear-gradient(145deg,#0c2d45,#0f3555)" : esDiaHoy ? "#0f2535" : "#0a1a24", border: tieneTour ? "1.5px solid #0ea5e9" : esDiaHoy ? "1.5px solid #334155" : "1px solid #12293a", borderRadius: 8, padding: "5px 4px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 2, position: "relative" }
           },
-            React.createElement("div", { style: { fontSize: 13, fontWeight: esDiaHoy ? 800 : 600, color: esDiaHoy ? "#0ea5e9" : esFinDeSemana ? "#64748b" : "#94a3b8", lineHeight: 1 } }, dia),
-            ...ts.slice(0, 3).map(t => {
+            React.createElement("div", { style: { fontSize: 12, fontWeight: esDiaHoy ? 800 : 600, color: esDiaHoy ? "#0ea5e9" : esFinDeSemana ? "#64748b" : "#94a3b8", lineHeight: 1 } }, dia),
+            ...ts.slice(0, 2).map(t => {
               const ti = TIPOS_TOUR[t.tipo] || TIPOS_TOUR.personalizado;
-              return React.createElement("div", { key: t.id, style: { background: t.pendienteConfirmar ? "#f59e0b18" : "linear-gradient(135deg,#0ea5e930,#0369a120)", border: t.pendienteConfirmar ? "1.5px dashed #f59e0b" : "1px solid #0ea5e950", borderRadius: 5, padding: "3px 5px" } },
-                React.createElement("div", { style: { fontSize: 9, color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, ti.label),
-                t.pendienteConfirmar ? React.createElement("div", { style: { fontSize: 9, color: "#f59e0b", fontWeight: 700 } }, "Sin confirmar") : React.createElement("div", { style: { fontSize: 10, color: ESTADO_PAGO_COLOR[t.estadoPago || "Pendiente"], fontWeight: 700 } }, fmt(t.ganancia))
+              return React.createElement("div", { key: t.id, style: { background: t.pendienteConfirmar ? "#f59e0b18" : "linear-gradient(135deg,#0ea5e930,#0369a120)", border: t.pendienteConfirmar ? "1.5px dashed #f59e0b" : "1px solid #0ea5e950", borderRadius: 4, padding: "2px 4px" } },
+                React.createElement("div", { style: { fontSize: 8.5, color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, ti.label),
+                t.pendienteConfirmar ? React.createElement("div", { style: { fontSize: 8.5, color: "#f59e0b", fontWeight: 700 } }, "Sin confirmar") : React.createElement("div", { style: { fontSize: 9.5, color: ESTADO_PAGO_COLOR[t.estadoPago || "Pendiente"], fontWeight: 700 } }, fmt(t.ganancia))
               );
             }),
-            ts.length > 3 ? React.createElement("div", { style: { fontSize: 9.5, color: "#7ec8e3", fontWeight: 700, textAlign: "center", padding: "2px 0" } }, "+ " + (ts.length - 3) + " más") : null,
-            esDiaHoy ? React.createElement("div", { style: { position: "absolute", bottom: 5, right: 5, width: 5, height: 5, borderRadius: "50%", background: "#0ea5e9" } }) : null
+            ts.length > 2 ? React.createElement("div", { style: { fontSize: 9, color: "#7ec8e3", fontWeight: 700, textAlign: "center", padding: "1px 0" } }, "+ " + (ts.length - 2) + " más") : null,
+            esDiaHoy ? React.createElement("div", { style: { position: "absolute", bottom: 4, right: 4, width: 5, height: 5, borderRadius: "50%", background: "#0ea5e9" } }) : null
           );
         })
       ),
-      React.createElement("div", { style: { display: "flex", gap: 16, marginTop: 14, justifyContent: "center" } },
+      React.createElement("div", { style: { display: "flex", gap: 16, marginTop: 10, justifyContent: "center" } },
         ...[ ["#0ea5e9","Tour registrado"], ["#334155","Hoy"] ].map(([c,l]) =>
           React.createElement("div", { key: l, style: { display: "flex", alignItems: "center", gap: 6 } },
-            React.createElement("div", { style: { width: 10, height: 10, borderRadius: 3, background: c } }),
-            React.createElement("span", { style: { fontSize: 11, color: "#475569" } }, l)
+            React.createElement("div", { style: { width: 9, height: 9, borderRadius: 3, background: c } }),
+            React.createElement("span", { style: { fontSize: 10.5, color: "#475569" } }, l)
           )
         )
       )
