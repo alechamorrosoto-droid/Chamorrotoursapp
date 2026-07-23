@@ -725,12 +725,15 @@ function LeadForm({ onSave, onCancel, leadToEdit, onConvert, onDelete }) {
     contacto: leadToEdit.contacto || "", notas: leadToEdit.notas || "", estado: leadToEdit.estado || "Pendiente",
     edades: leadToEdit.edades || "", alergias: leadToEdit.alergias || "", preferencias: leadToEdit.preferencias || "",
     email: leadToEdit.email || "", horaEstimada: leadToEdit.horaEstimada || "", emailPM: leadToEdit.emailPM || "",
+    paxCompartido: leadToEdit.paxCompartido || "", paxSolo: leadToEdit.paxSolo || "",
+    nadar: leadToEdit.nadar || "", peso: leadToEdit.peso || "",
   } : {
     propertyManagement: "Casas del Caribe", huesped: "", unidad: "",
     tourInteres: "", pax: "", fecha: new Date().toISOString().split("T")[0],
     contacto: "", notas: "", estado: "Pendiente",
     edades: "", alergias: "", preferencias: "",
     email: "", horaEstimada: "", emailPM: "",
+    paxCompartido: "", paxSolo: "", nadar: "", peso: "",
   });
   const h = (k, v) => setF(p => ({ ...p, [k]: v }));
 
@@ -741,7 +744,10 @@ function LeadForm({ onSave, onCancel, leadToEdit, onConvert, onDelete }) {
     if (!f.huesped || !f.fecha) return;
     const propertyManagement = pm === "__new" ? (document.getElementById("pm-custom-input")?.value.trim() || "Otro") : pm;
     const idiomaFinal = idioma === "__new" ? (document.getElementById("idioma-custom-input")?.value.trim() || "Otro") : idioma;
-    onSave({ ...f, propertyManagement, idioma: idiomaFinal, id: leadToEdit ? leadToEdit.id : Date.now(), pax: Number(f.pax) || 0 });
+    const esAtvGuardar = f.tourInteres === "atv1" || f.tourInteres === "atv2";
+    const paxFinal = esAtvGuardar ? ((Number(f.paxCompartido)||0) + (Number(f.paxSolo)||0)) : (Number(f.pax) || 0);
+    onSave({ ...f, propertyManagement, idioma: idiomaFinal, id: leadToEdit ? leadToEdit.id : Date.now(), pax: paxFinal,
+      paxCompartido: esAtvGuardar ? (Number(f.paxCompartido)||0) : 0, paxSolo: esAtvGuardar ? (Number(f.paxSolo)||0) : 0 });
   }
 
   return React.createElement("div", { style: { padding: 18 } },
@@ -778,11 +784,35 @@ function LeadForm({ onSave, onCancel, leadToEdit, onConvert, onDelete }) {
           ...Object.entries(TIPOS_TOUR).map(([key, t]) => React.createElement("option", { key, value: key }, t.label))
         )
       ),
-      React.createElement("div", null,
+      (f.tourInteres === "atv1" || f.tourInteres === "atv2") ? null : React.createElement("div", null,
         React.createElement("label", { style: lbl }, "# Pax estimado"),
         React.createElement("input", { type: "number", value: f.pax, onChange: e => h("pax", e.target.value), style: inp })
       )
     ),
+    (f.tourInteres === "atv1" || f.tourInteres === "atv2") ? React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 12, marginBottom: 10 } },
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "¿Cuántos en cuadra compartida?"),
+        React.createElement("input", { type: "number", value: f.paxCompartido, onChange: e => h("paxCompartido", e.target.value), style: inp })
+      ),
+      React.createElement("div", null,
+        React.createElement("label", { style: lbl }, "¿Cuántos prefieren cuadra solo?"),
+        React.createElement("input", { type: "number", value: f.paxSolo, onChange: e => h("paxSolo", e.target.value), style: inp })
+      )
+    ) : null,
+    (f.tourInteres === "atv1" || f.tourInteres === "atv2") ? React.createElement("div", { style: { marginBottom: 10 } },
+      React.createElement("label", { style: lbl }, "Peso aproximado de quienes manejan cuadra"),
+      React.createElement("input", { type: "text", value: f.peso, onChange: e => h("peso", e.target.value), style: inp, placeholder: "Ej: 3 alrededor de 70kg, 1 alrededor de 100kg" })
+    ) : null,
+    (f.tourInteres === "kayaking" || f.tourInteres === "dolphin" || f.tourInteres === "snorkeling") ? React.createElement("div", { style: { marginBottom: 10 } },
+      React.createElement("label", { style: lbl }, "Habilidad para nadar"),
+      React.createElement("select", { value: f.nadar, onChange: e => h("nadar", e.target.value), style: inp },
+        React.createElement("option", { value: "" }, "Selecciona una opción"),
+        React.createElement("option", { value: "Nada bien" }, "Nada bien"),
+        React.createElement("option", { value: "Algo de experiencia" }, "Algo de experiencia"),
+        React.createElement("option", { value: "No sabe nadar" }, "No sabe nadar"),
+        React.createElement("option", { value: "Prefiere no decir" }, "Prefiere no decir")
+      )
+    ) : null,
     React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 12, marginBottom: 10 } },
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "Contacto del PM (WhatsApp / Email)"),
@@ -1119,7 +1149,7 @@ function App() {
       precioPax: tipo.precioPax, precioSolo: tipo.precioSolo || 0,
       comisionPct: COMISION_DEFAULT, pagoGuia: 0,
       fruta: 0, transporte: 0, kayaks: 0, entradas: 0, otros: 0,
-      metodoPago: "Transferencia", guiaNombre: "", notas: lead.notas || "", estadoPago: "Pendiente",
+      metodoPago: "Transferencia", guiaNombre: "", notas: [lead.nadar ? "🏊 Nadar: " + lead.nadar : "", lead.peso ? "⚖️ Peso (ATV): " + lead.peso : "", lead.notas || ""].filter(Boolean).join("\n"), estadoPago: "Pendiente",
       montoPagado: "",
     };
     const k = mesKeyDeFecha(tour.fecha);
@@ -1241,6 +1271,8 @@ function App() {
     const notas = [
       lead.idioma ? "🗣 Idioma: " + lead.idioma : "",
       lead.edades ? "👥 Edades: " + lead.edades : "",
+      lead.nadar ? "🏊 Nadar: " + lead.nadar : "",
+      lead.peso ? "⚖️ Peso (ATV): " + lead.peso : "",
       lead.alergias ? "🚨 Alergias: " + lead.alergias : "",
       lead.preferencias ? "🍽 Preferencias: " + lead.preferencias : "",
       lead.notas ? "📝 " + lead.notas : "",

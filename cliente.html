@@ -205,7 +205,7 @@
           </div>
 
           <div class="waiver-block">
-            <details class="policy-details">
+            <details class="policy-details" open>
               <summary><div class="eyebrow">Payment &amp; cancellation policy</div></summary>
               <div class="waiver-text">
                 A 50% deposit is required to confirm this booking; the remaining balance is paid on the day of the tour. If you cancel 48 hours or more before your tour, your deposit is fully refunded. If you cancel between 24 and 48 hours before your tour, the deposit is non-refundable, but you may reschedule to another date or switch tours at no extra cost. If you cancel with less than 24 hours' notice, the deposit is forfeited and cannot be rescheduled or exchanged. If we cancel your tour due to weather or sea conditions, it will be rescheduled or switched at no cost or penalty to you.
@@ -215,7 +215,7 @@
               <input type="checkbox" id="politica" />
               <span>I have read and agree to the payment and cancellation policy above <span class="req">*</span></span>
             </label>
-            <details class="policy-details" id="payment-method-block" style="margin-top: 14px;">
+            <details class="policy-details" id="payment-method-block" style="margin-top: 14px;" open>
               <summary><div class="eyebrow">Payment method</div></summary>
               <div class="pay-links" style="margin-top: 10px;">
                 <a class="pay-btn" href="https://www.paypal.me/chamorral" target="_blank" rel="noopener">Pay via PayPal</a>
@@ -237,6 +237,11 @@
                   <span class="bank-label">IBAN</span>
                   <span class="bank-value" id="bac-iban">CR07010200009609637912</span>
                   <button type="button" class="bank-copy" onclick="copiarDato('bac-iban', this)">Copy</button>
+                </div>
+                <div class="bank-row">
+                  <span class="bank-label">SINPE Móvil (Costa Rica)</span>
+                  <span class="bank-value" id="sinpe-cliente">89716121</span>
+                  <button type="button" class="bank-copy" onclick="copiarDato('sinpe-cliente', this)">Copy</button>
                 </div>
               </div>
             </details>
@@ -431,8 +436,12 @@ function actualizarQueTraer() {
   const box = document.getElementById("que-traer");
   const lista = QUE_TRAER[tour];
   if (!lista) { box.style.display = "none"; return; }
+  let extra = "";
+  if (tour === "chocolate") {
+    extra = "<p style='margin-top:8px; font-size:12.5px;'>🏊 There's a stop to swim at the waterfall — it's a short, calm dip, so you don't need to be a strong swimmer.</p>";
+  }
   box.innerHTML = "<div class='eyebrow'>What to bring</div><ul>"
-    + lista.map(item => "<li>" + item + "</li>").join("") + "</ul>";
+    + lista.map(item => "<li>" + item + "</li>").join("") + "</ul>" + extra;
   box.style.display = "block";
 }
 

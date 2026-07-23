@@ -80,6 +80,17 @@
     .waiver-text { font-size: 12px; color: var(--muted); line-height: 1.6; background: var(--sand); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; max-height: 130px; overflow-y: auto; }
     .waiver-check { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; font-size: 13px; color: var(--ink); line-height: 1.5; cursor: pointer; }
     .waiver-check input { width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; accent-color: var(--teal); }
+    .policy-details summary { cursor: pointer; list-style: none; }
+    .policy-details summary::-webkit-details-marker { display: none; }
+    .pay-links { display: flex; gap: 10px; flex-wrap: wrap; }
+    .pay-btn { flex: 1; min-width: 140px; text-align: center; background: var(--teal); color: #fff; text-decoration: none; padding: 10px 14px; border-radius: 8px; font-weight: 700; font-size: 13px; }
+    .pay-note { font-size: 12px; color: var(--muted); line-height: 1.6; margin-top: 10px; }
+    .bank-box { background: var(--sand); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-top: 12px; }
+    .bank-title { font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+    .bank-row { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; padding: 4px 0; gap: 8px; }
+    .bank-label { color: var(--muted); }
+    .bank-value { font-weight: 700; color: var(--ink); }
+    .bank-copy { background: transparent; border: 1px solid var(--teal); color: var(--teal); border-radius: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -145,6 +156,22 @@
         <input type="text" id="edades" placeholder="Ej: 2 adultos, niños de 8 y 12" />
         <p style="font-size:12px; color:var(--muted); margin-top:6px;">Los niños mayores de 5 años pagan tarifa completa. Para tours de ATV, deben ser mayores de 6 años.</p>
 
+        <div id="campo-nadar" style="display:none;">
+          <label>Habilidad para nadar</label>
+          <select id="nadar">
+            <option value="">Selecciona una opción</option>
+            <option value="Nada bien">Nada bien</option>
+            <option value="Algo de experiencia">Algo de experiencia</option>
+            <option value="No sabe nadar">No sabe nadar</option>
+            <option value="Prefiere no decir">Prefiere no decir</option>
+          </select>
+        </div>
+
+        <div id="campo-peso" style="display:none;">
+          <label>Peso aproximado de quienes manejan cuadra (ayuda a asignar el equipo de forma segura)</label>
+          <input type="text" id="peso" placeholder="Ej: 3 alrededor de 70kg, 1 alrededor de 100kg" />
+        </div>
+
         <label>Idioma</label>
         <select id="idioma">
           <option>Español</option>
@@ -179,7 +206,48 @@
         </div>
 
         <div class="waiver-block" id="bloque-waiver">
-          <div class="waiver-text">
+          <details class="policy-details" open>
+            <summary><div class="eyebrow">Política de pago y cancelación</div></summary>
+            <div class="waiver-text">
+              Se requiere un depósito del 50% para confirmar esta reserva; el saldo restante se paga el día del tour. Si cancelas con 48 horas o más de anticipación, tu depósito se reembolsa completo. Si cancelas entre 24 y 48 horas antes, el depósito no es reembolsable, pero puedes reprogramar para otra fecha o cambiar de tour sin costo extra. Si cancelas con menos de 24 horas de anticipación, el depósito se pierde y no se puede reprogramar ni cambiar. Si nosotros cancelamos tu tour por clima o condiciones del mar, se reprograma o cambia sin costo ni penalidad para ti.
+            </div>
+          </details>
+          <label class="waiver-check">
+            <input type="checkbox" id="politica" />
+            <span>He leído y acepto la política de pago y cancelación <span class="req">*</span></span>
+          </label>
+          <details class="policy-details" id="metodo-pago-block" style="margin-top: 14px;" open>
+            <summary><div class="eyebrow">Método de pago</div></summary>
+            <div class="pay-links" style="margin-top: 10px;">
+              <a class="pay-btn" href="https://www.paypal.me/chamorral" target="_blank" rel="noopener">Pagar con PayPal</a>
+              <a class="pay-btn" href="https://wise.com/pay/me/702090402c" target="_blank" rel="noopener">Pagar con Wise</a>
+            </div>
+            <p class="pay-note">Usa cualquiera de los 2 links para enviar tu depósito del 50%. PayPal y Wise cobran una comisión — por favor agrega 5% para cubrirla, así recibimos el depósito completo. Si prefieres evitar la comisión, usa la transferencia bancaria local abajo. Una vez confirmemos tu pago, tu reserva queda asegurada y te llega tu ticket de confirmación.</p>
+            <div class="bank-box">
+              <div class="bank-title">O por transferencia bancaria local (BAC / SINPE) — solo Costa Rica</div>
+              <div class="bank-row">
+                <span class="bank-label">Titular de la cuenta</span>
+                <span class="bank-value">ALEJANDRO CHAMORRO SOTO</span>
+              </div>
+              <div class="bank-row">
+                <span class="bank-label">Cuenta BAC</span>
+                <span class="bank-value" id="bac-account-lead">960963791</span>
+                <button type="button" class="bank-copy" onclick="copiarDato('bac-account-lead', this)">Copiar</button>
+              </div>
+              <div class="bank-row">
+                <span class="bank-label">IBAN</span>
+                <span class="bank-value" id="bac-iban-lead">CR07010200009609637912</span>
+                <button type="button" class="bank-copy" onclick="copiarDato('bac-iban-lead', this)">Copiar</button>
+              </div>
+              <div class="bank-row">
+                <span class="bank-label">SINPE Móvil</span>
+                <span class="bank-value" id="sinpe-lead">89716121</span>
+                <button type="button" class="bank-copy" onclick="copiarDato('sinpe-lead', this)">Copiar</button>
+              </div>
+            </div>
+          </details>
+
+          <div class="waiver-text" style="margin-top: 14px;">
             Entiendo que este tour incluye actividad física y riesgos propios de la actividad (agua, terreno, animales, clima o equipo). Confirmo que la información del grupo dada arriba es correcta, que asumo esos riesgos de forma voluntaria, y libero a Chamorro Tours, sus guías y las propiedades asociadas de responsabilidad por lesión, pérdida o daño, salvo negligencia grave. Entiendo que la participación es bajo mi propio riesgo.
           </div>
           <label class="waiver-check">
@@ -221,6 +289,7 @@ let ultimoLeadId = null;
 
 function v(id) { return document.getElementById(id).value.trim(); }
 
+const TOURS_AGUA = ["kayaking", "dolphin", "snorkeling"];
 const PRECIOS = {
   kayaking: { pax: 65 },
   dolphin: { pax: 120 },
@@ -260,6 +329,8 @@ function actualizarCamposPax() {
   const esAtv = tour === "atv1" || tour === "atv2";
   document.getElementById("bloque-pax-normal").style.display = esAtv ? "none" : "block";
   document.getElementById("bloque-pax-atv").style.display = esAtv ? "block" : "none";
+  document.getElementById("campo-nadar").style.display = TOURS_AGUA.includes(tour) ? "block" : "none";
+  document.getElementById("campo-peso").style.display = esAtv ? "block" : "none";
 }
 
 const QUE_TRAER = {
@@ -276,8 +347,12 @@ function actualizarQueTraer() {
   const box = document.getElementById("que-traer");
   const lista = QUE_TRAER[tour];
   if (!lista) { box.style.display = "none"; return; }
+  let extra = "";
+  if (tour === "chocolate") {
+    extra = "<p style='margin-top:8px; font-size:12.5px;'>🏊 Hay una parada para nadar en la catarata — es un chapuzón corto y tranquilo, no hace falta saber nadar bien.</p>";
+  }
   box.innerHTML = "<span class='eyebrow'>Qué llevar</span><ul>"
-    + lista.map(item => "<li>" + item + "</li>").join("") + "</ul>";
+    + lista.map(item => "<li>" + item + "</li>").join("") + "</ul>" + extra;
   box.style.display = "block";
 }
 
@@ -349,6 +424,18 @@ function actualizarCampoUnidad() {
 }
 actualizarCampoUnidad();
 
+async function copiarDato(id, btn) {
+  const texto = document.getElementById(id).textContent.trim();
+  try {
+    await navigator.clipboard.writeText(texto);
+    const original = btn.textContent;
+    btn.textContent = "¡Copiado!";
+    setTimeout(() => { btn.textContent = original; }, 1800);
+  } catch (e) {
+    prompt("Copia esto:", texto);
+  }
+}
+
 function linkCliente() {
   return CLIENTE_FORM_URL + "?id=" + ultimoLeadId;
 }
@@ -416,6 +503,11 @@ async function enviar() {
     err.style.display = "block";
     return;
   }
+  if (!ES_VIA_ALGUIEN && !document.getElementById("politica").checked) {
+    err.textContent = "Por favor confirma que leíste y aceptas la política de pago y cancelación.";
+    err.style.display = "block";
+    return;
+  }
   if (!ES_VIA_ALGUIEN && !document.getElementById("waiver").checked) {
     err.textContent = "Por favor confirma que leíste y aceptas la exención de responsabilidad.";
     err.style.display = "block";
@@ -423,6 +515,16 @@ async function enviar() {
   }
   if (esAtv && VIA !== "cdc" && paxCompartido <= 0 && paxSolo <= 0) {
     err.textContent = "Por favor indica cuántos van en cuadra compartida o cuántos prefieren cuadra solo.";
+    err.style.display = "block";
+    return;
+  }
+  if (!ES_VIA_ALGUIEN && TOURS_AGUA.includes(v("tour")) && !v("nadar")) {
+    err.textContent = "Por favor indica la habilidad para nadar.";
+    err.style.display = "block";
+    return;
+  }
+  if (!ES_VIA_ALGUIEN && esAtv && !v("peso")) {
+    err.textContent = "Por favor indica el peso aproximado de quienes manejan cuadra.";
     err.style.display = "block";
     return;
   }
@@ -442,6 +544,7 @@ async function enviar() {
     emailPM: v("emailPM"),
     waiverAceptado: !ES_VIA_ALGUIEN,
     waiverFecha: new Date().toISOString(),
+    politicaAceptada: !ES_VIA_ALGUIEN,
     unidad: v("unidad"),
     contacto: v("contacto"),
     email: v("email"),
@@ -449,6 +552,8 @@ async function enviar() {
     pax: Number(pax) || 0,
     paxCompartido: esAtv ? paxCompartido : 0,
     paxSolo: esAtv ? paxSolo : 0,
+    nadar: v("nadar"),
+    peso: v("peso"),
     edades: v("edades"),
     idioma: v("idioma"),
     alergias: v("alergias"),
@@ -497,9 +602,10 @@ async function enviar() {
 
 function reiniciar() {
   ultimoLeadId = null;
-  ["huesped","unidad","contacto","email","fecha","horaEstimada","tour","pax","paxCompartido","paxSolo","edades","alergias","preferencias","notas","remitente","emailPM"].forEach(id => document.getElementById(id).value = "");
+  ["huesped","unidad","contacto","email","fecha","horaEstimada","tour","pax","paxCompartido","paxSolo","edades","nadar","peso","alergias","preferencias","notas","remitente","emailPM"].forEach(id => document.getElementById(id).value = "");
   if (document.getElementById("pmReferente")) document.getElementById("pmReferente").value = "";
   document.getElementById("waiver").checked = false;
+  document.getElementById("politica").checked = false;
   actualizarCamposPax();
   document.getElementById("ok-pane").style.display = "none";
   document.getElementById("form-pane").style.display = "block";
