@@ -114,7 +114,7 @@
         <input type="time" id="horaEstimada" />
 
         <label>Tour de interés</label>
-        <select id="tour" onchange="actualizarPrecioEstimado(); actualizarQueTraer();">
+        <select id="tour" onchange="actualizarPrecioEstimado(); actualizarQueTraer(); actualizarCamposPax();">
           <option value="">Selecciona un tour</option>
           <option value="kayaking">Kayaking</option>
           <option value="dolphin">Dolphin Tour</option>
@@ -128,8 +128,18 @@
         <div id="precio-estimado" class="callout" style="display:none;"></div>
         <div id="que-traer" class="callout" style="display:none;"></div>
 
-        <label># de personas</label>
-        <input type="number" id="pax" min="1" placeholder="4" oninput="actualizarPrecioEstimado()" />
+        <div id="bloque-pax-normal">
+          <label># de personas</label>
+          <input type="number" id="pax" min="1" placeholder="4" oninput="actualizarPrecioEstimado()" />
+        </div>
+
+        <div id="bloque-pax-atv" style="display:none;">
+          <label id="label-pax-compartido">¿Cuántos van en cuadra compartida (2 por cuadra)?</label>
+          <input type="number" id="paxCompartido" min="0" placeholder="Ej: 4" oninput="actualizarPrecioEstimado()" />
+          <label id="label-pax-solo" style="margin-top:10px;">¿Cuántos prefieren cuadra solo (1 por cuadra)?</label>
+          <input type="number" id="paxSolo" min="0" placeholder="Ej: 2" oninput="actualizarPrecioEstimado()" />
+          <p id="nota-pax-atv" style="font-size:12px; color:var(--muted); margin-top:6px;"></p>
+        </div>
 
         <label>Edades del grupo</label>
         <input type="text" id="edades" placeholder="Ej: 2 adultos, niños de 8 y 12" />
@@ -222,21 +232,34 @@ const PRECIOS = {
 
 function actualizarPrecioEstimado() {
   const tour = v("tour");
-  const pax = Number(v("pax")) || 0;
+  const esAtv = tour === "atv1" || tour === "atv2";
   const box = document.getElementById("precio-estimado");
   const precios = PRECIOS[tour];
   if (!precios) { box.style.display = "none"; return; }
 
   let texto;
-  if (precios.pax) {
+  if (!esAtv) {
+    const pax = Number(v("pax")) || 0;
     texto = "<span class='eyebrow'>Precio</span>$" + precios.pax + " por persona";
     if (pax > 0) texto += " · Total: $" + (precios.pax * pax);
   } else {
+    const compartido = Number(v("paxCompartido")) || 0;
+    const solo = Number(v("paxSolo")) || 0;
     texto = "<span class='eyebrow'>Precio</span>$" + precios.compartido + "/persona (quad compartido) o $" + precios.solo + "/persona (quad solo)";
-    if (pax > 0) texto += " · Total compartido: $" + (precios.compartido * pax) + " · Total solo: $" + (precios.solo * pax);
+    if (compartido > 0 || solo > 0) {
+      const total = precios.compartido * compartido + precios.solo * solo;
+      texto += " · Total: $" + total;
+    }
   }
   box.innerHTML = texto;
   box.style.display = "block";
+}
+
+function actualizarCamposPax() {
+  const tour = v("tour");
+  const esAtv = tour === "atv1" || tour === "atv2";
+  document.getElementById("bloque-pax-normal").style.display = esAtv ? "none" : "block";
+  document.getElementById("bloque-pax-atv").style.display = esAtv ? "block" : "none";
 }
 
 const QUE_TRAER = {
@@ -315,6 +338,13 @@ function actualizarCampoUnidad() {
     document.getElementById("wordmark-propio").style.display = "none";
     document.getElementById("logo-cdc").style.display = "block";
     document.getElementById("bloque-email-pm").style.display = "block";
+    document.getElementById("label-pax-compartido").textContent = "¿Cuántos van en cuadra compartida (2 por cuadra)? (opcional)";
+    document.getElementById("label-pax-solo").textContent = "¿Cuántos prefieren cuadra solo (1 por cuadra)? (opcional)";
+    document.getElementById("nota-pax-atv").textContent = "Si no lo sabes todavía, déjalo así — Alejandro lo confirma con el huésped después.";
+  } else {
+    document.getElementById("label-pax-compartido").innerHTML = "¿Cuántos van en cuadra compartida (2 por cuadra)? <span class=\"req\">*</span>";
+    document.getElementById("label-pax-solo").innerHTML = "¿Cuántos prefieren cuadra solo (1 por cuadra)? <span class=\"req\">*</span>";
+    document.getElementById("nota-pax-atv").textContent = "";
   }
 }
 actualizarCampoUnidad();
@@ -360,7 +390,11 @@ async function enviar() {
   err.style.display = "none";
   warn.style.display = "none";
 
-  const huesped = v("huesped"), fecha = v("fecha"), pax = v("pax");
+  const huesped = v("huesped"), fecha = v("fecha");
+  const esAtv = v("tour") === "atv1" || v("tour") === "atv2";
+  const paxCompartido = Number(v("paxCompartido")) || 0;
+  const paxSolo = Number(v("paxSolo")) || 0;
+  const pax = esAtv ? (paxCompartido + paxSolo) : v("pax");
   if (!huesped) {
     err.textContent = "Por favor completa al menos el nombre del huésped o grupo.";
     err.style.display = "block";
@@ -387,6 +421,11 @@ async function enviar() {
     err.style.display = "block";
     return;
   }
+  if (esAtv && VIA !== "cdc" && paxCompartido <= 0 && paxSolo <= 0) {
+    err.textContent = "Por favor indica cuántos van en cuadra compartida o cuántos prefieren cuadra solo.";
+    err.style.display = "block";
+    return;
+  }
 
   const btn = document.getElementById("btn");
   btn.disabled = true;
@@ -408,6 +447,8 @@ async function enviar() {
     email: v("email"),
     tourInteres: v("tour"),
     pax: Number(pax) || 0,
+    paxCompartido: esAtv ? paxCompartido : 0,
+    paxSolo: esAtv ? paxSolo : 0,
     edades: v("edades"),
     idioma: v("idioma"),
     alergias: v("alergias"),
@@ -456,9 +497,10 @@ async function enviar() {
 
 function reiniciar() {
   ultimoLeadId = null;
-  ["huesped","unidad","contacto","email","fecha","horaEstimada","tour","pax","edades","alergias","preferencias","notas","remitente","emailPM"].forEach(id => document.getElementById(id).value = "");
+  ["huesped","unidad","contacto","email","fecha","horaEstimada","tour","pax","paxCompartido","paxSolo","edades","alergias","preferencias","notas","remitente","emailPM"].forEach(id => document.getElementById(id).value = "");
   if (document.getElementById("pmReferente")) document.getElementById("pmReferente").value = "";
   document.getElementById("waiver").checked = false;
+  actualizarCamposPax();
   document.getElementById("ok-pane").style.display = "none";
   document.getElementById("form-pane").style.display = "block";
   window.scrollTo(0, 0);

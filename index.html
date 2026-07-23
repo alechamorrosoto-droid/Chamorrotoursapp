@@ -401,7 +401,7 @@ function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill, forcedI
   } : {
     fecha: fechaInicial || new Date().toISOString().split("T")[0],
     hora: prefill?.hora || "", puntoEncuentro: "", contactoCliente: prefill?.contactoCliente || "", emailCliente: prefill?.emailCliente || "", emailPropertyManagement: prefill?.emailPropertyManagement || "", propertyManagement: prefill?.propertyManagement || "Directo",
-    cliente: prefill?.cliente || "", pax: prefill?.pax || "", paxCompartido: "", paxSolo: "",
+    cliente: prefill?.cliente || "", pax: prefill?.pax || "", paxCompartido: prefill?.paxCompartido || "", paxSolo: prefill?.paxSolo || "",
     precioPax: tipo.precioPax, precioSolo: tipo.precioSolo || 0,
     comisionPct: COMISION_DEFAULT, pagoGuia: 0,
     fruta: 0, transporte: 0, kayaks: 0, entradas: 0, otros: 0,
@@ -416,10 +416,20 @@ function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill, forcedI
     setF(p => ({ ...p, precioPax: t.precioPax || p.precioPax, precioSolo: t.precioSolo || 0, paxCompartido: "", paxSolo: "" }));
   }
   const { ingreso, comisionUSD, gastoTotal, ganancia, paxTotal } = calcTour(f, tipoKey);
+  const [errorGuardado, setErrorGuardado] = React.useState("");
 
   function save() {
-    if (tipo.esAtv) { if (!f.fecha || !f.cliente || (Number(f.paxCompartido) <= 0 && Number(f.paxSolo) <= 0)) return; }
-    else { if (!f.fecha || !f.cliente || !(Number(f.pax) > 0) || !(Number(f.precioPax) > 0)) return; }
+    if (tipo.esAtv) {
+      if (!f.fecha) { setErrorGuardado("Falta la fecha."); return; }
+      if (!f.cliente) { setErrorGuardado("Falta el nombre del cliente."); return; }
+      if (Number(f.paxCompartido) <= 0 && Number(f.paxSolo) <= 0) { setErrorGuardado("Pon al menos 1 pax en \"Pax quad compartido\" o \"Pax quad solo\" — ambos están vacíos."); return; }
+    } else {
+      if (!f.fecha) { setErrorGuardado("Falta la fecha."); return; }
+      if (!f.cliente) { setErrorGuardado("Falta el nombre del cliente."); return; }
+      if (!(Number(f.pax) > 0)) { setErrorGuardado("El número de pax debe ser mayor a 0."); return; }
+      if (!(Number(f.precioPax) > 0)) { setErrorGuardado("El precio por persona debe ser mayor a 0."); return; }
+    }
+    setErrorGuardado("");
     onSave({ ...f, id: tourToEdit ? tourToEdit.id : (forcedId || Date.now()), tipo: tipoKey, pax: paxTotal,
       paxCompartido: Number(f.paxCompartido)||0, paxSolo: Number(f.paxSolo)||0,
       precioPax: Number(f.precioPax), precioSolo: Number(f.precioSolo)||0,
@@ -568,6 +578,7 @@ function TourForm({ onSave, onCancel, fechaInicial, tourToEdit, prefill, forcedI
           React.createElement("div", { style: { fontSize: 15, fontWeight: 800, color: c } }, fmt(v))
         ))
     ),
+    errorGuardado ? React.createElement("div", { style: { background: "#3b0d0d", border: "1px solid #f87171", color: "#fca5a5", borderRadius: 8, padding: "10px 12px", fontSize: 13, marginTop: 12 } }, "⚠️ " + errorGuardado) : null,
     React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 14 } },
       React.createElement("button", { onClick: save, style: { flex: 1, background: "linear-gradient(135deg,#0ea5e9,#0369a1)", color: "#fff", border: "none", borderRadius: 8, padding: 12, fontWeight: 700, cursor: "pointer", fontSize: 14 } }, tourToEdit ? "Guardar Cambios" : "Guardar Tour"),
       React.createElement("button", { onClick: onCancel, style: { flex: 1, background: "transparent", color: "#7ec8e3", border: "1px solid #1e4060", borderRadius: 8, padding: 12, cursor: "pointer", fontSize: 14 } }, "Cancelar")
@@ -1120,7 +1131,7 @@ function App() {
       contactoCliente: lead.contacto || "", emailCliente: lead.email || "", emailPropertyManagement: lead.emailPM || "",
       propertyManagement: lead.propertyManagement || "Directo",
       cliente: lead.huesped + (lead.unidad ? " (" + lead.unidad + ")" : ""),
-      tipo: tipoKey, pax: lead.pax || "", paxCompartido: "", paxSolo: "",
+      tipo: tipoKey, pax: lead.pax || "", paxCompartido: lead.paxCompartido || "", paxSolo: lead.paxSolo || "",
       precioPax: tipo.precioPax, precioSolo: tipo.precioSolo || 0,
       comisionPct: COMISION_DEFAULT, pagoGuia: 0,
       fruta: 0, transporte: 0, kayaks: 0, entradas: 0, otros: 0,
@@ -1253,7 +1264,7 @@ function App() {
     setPanel({
       tipo: "form",
       dia: lead.fecha || (year + "-" + String(month).padStart(2, "0") + "-01"),
-      prefill: { cliente: lead.huesped + (lead.unidad ? " (" + lead.unidad + ")" : ""), pax: lead.pax || "", tipoKey: lead.tourInteres || "kayaking", notas, propertyManagement: lead.propertyManagement || "Directo", hora: lead.horaEstimada || "", emailPropertyManagement: lead.emailPM || "", emailCliente: lead.email || "", contactoCliente: lead.contacto || "" },
+      prefill: { cliente: lead.huesped + (lead.unidad ? " (" + lead.unidad + ")" : ""), pax: lead.pax || "", paxCompartido: lead.paxCompartido || "", paxSolo: lead.paxSolo || "", tipoKey: lead.tourInteres || "kayaking", notas, propertyManagement: lead.propertyManagement || "Directo", hora: lead.horaEstimada || "", emailPropertyManagement: lead.emailPM || "", emailCliente: lead.email || "", contactoCliente: lead.contacto || "" },
       leadId: lead.id,
     });
   }

@@ -143,8 +143,17 @@
           <div id="precio-estimado" class="callout" style="display:none;"></div>
           <div id="que-traer" class="callout" style="display:none;"></div>
 
-          <label>Number of guests <span class="req">*</span></label>
-          <input type="number" id="pax" min="1" placeholder="e.g. 4" oninput="actualizarPrecioEstimado()" />
+          <div id="bloque-pax-normal">
+            <label>Number of guests <span class="req">*</span></label>
+            <input type="number" id="pax" min="1" placeholder="e.g. 4" oninput="actualizarPrecioEstimado()" />
+          </div>
+
+          <div id="bloque-pax-atv" style="display:none;">
+            <label>How many in a shared quad (2 per quad)?</label>
+            <input type="number" id="paxCompartido" min="0" placeholder="e.g. 4" oninput="actualizarPrecioEstimado()" />
+            <label style="margin-top:10px;">How many prefer a solo quad (1 per quad)?</label>
+            <input type="number" id="paxSolo" min="0" placeholder="e.g. 2" oninput="actualizarPrecioEstimado()" />
+          </div>
 
           <label>Ages of the group <span class="req">*</span></label>
           <input type="text" id="edades" placeholder="e.g. 2 adults, kids age 8 and 12" />
@@ -308,7 +317,12 @@ async function cargarInfoLead() {
     rellenar("huesped", info.huesped);
     rellenar("contacto", info.contacto);
     rellenar("edades", info.edades);
-    if (info.pax && !document.getElementById("pax").value) document.getElementById("pax").value = info.pax;
+    if (TOURS_ATV.includes(info.tourInteres)) {
+      if (info.paxCompartido && !document.getElementById("paxCompartido").value) document.getElementById("paxCompartido").value = info.paxCompartido;
+      if (info.paxSolo && !document.getElementById("paxSolo").value) document.getElementById("paxSolo").value = info.paxSolo;
+    } else if (info.pax && !document.getElementById("pax").value) {
+      document.getElementById("pax").value = info.pax;
+    }
     if (info.tourInteres && !document.getElementById("tour").value) {
       document.getElementById("tour").value = info.tourInteres;
       actualizarCamposCondicionales();
@@ -372,17 +386,23 @@ const PRECIOS = {
 
 function actualizarPrecioEstimado() {
   const tour = v("tour");
-  const pax = Number(v("pax")) || 0;
+  const esAtv = TOURS_ATV.includes(tour);
   const box = document.getElementById("precio-estimado");
   const precios = PRECIOS[tour];
   if (!precios) { box.style.display = "none"; return; }
 
   let texto;
-  if (precios.pax) {
+  if (!esAtv) {
+    const pax = Number(v("pax")) || 0;
     texto = "<span class='eyebrow'>Price</span>$" + precios.pax + " per person";
     if (pax > 0) texto += " · Total: $" + (precios.pax * pax);
   } else {
+    const compartido = Number(v("paxCompartido")) || 0;
+    const solo = Number(v("paxSolo")) || 0;
     texto = "<span class='eyebrow'>Price</span>$" + precios.compartido + "/person (shared quad) or $" + precios.solo + "/person (private quad)";
+    if (compartido > 0 || solo > 0) {
+      texto += " · Total: $" + (precios.compartido * compartido + precios.solo * solo);
+    }
   }
   box.innerHTML = texto;
   box.style.display = "block";
@@ -393,6 +413,8 @@ function actualizarCamposCondicionales() {
   document.getElementById("campo-nadar").style.display = TOURS_AGUA.includes(tour) ? "block" : "none";
   document.getElementById("campo-peso").style.display = TOURS_ATV.includes(tour) ? "block" : "none";
   document.getElementById("nota-edad-atv").style.display = TOURS_ATV.includes(tour) ? "block" : "none";
+  document.getElementById("bloque-pax-normal").style.display = TOURS_ATV.includes(tour) ? "none" : "block";
+  document.getElementById("bloque-pax-atv").style.display = TOURS_ATV.includes(tour) ? "block" : "none";
 }
 
 const QUE_TRAER = {
@@ -422,7 +444,11 @@ function mostrarResumen() {
   const filas = [];
   if (v("huesped")) filas.push(["Guest", v("huesped")]);
   if (v("tour")) filas.push(["Tour", tourTexto]);
-  if (v("pax")) filas.push(["Guests", v("pax")]);
+  const esAtvResumen = TOURS_ATV.includes(v("tour"));
+  if (esAtvResumen) {
+    const c = Number(v("paxCompartido")) || 0, s = Number(v("paxSolo")) || 0;
+    if (c > 0 || s > 0) filas.push(["Guests", (c + s) + " (" + c + " shared, " + s + " solo)"]);
+  } else if (v("pax")) filas.push(["Guests", v("pax")]);
 
   if (tourInfoCache && tourInfoCache.fechaHora) {
     const d = new Date(tourInfoCache.fechaHora);
@@ -469,7 +495,14 @@ async function enviar() {
     err.style.display = "block";
     return;
   }
-  if (!v("pax")) {
+  const esAtvEnvio = TOURS_ATV.includes(v("tour"));
+  if (esAtvEnvio) {
+    if ((Number(v("paxCompartido")) || 0) <= 0 && (Number(v("paxSolo")) || 0) <= 0) {
+      err.textContent = "Please fill in at least one: shared quad or solo quad guests.";
+      err.style.display = "block";
+      return;
+    }
+  } else if (!v("pax")) {
     err.textContent = "Please fill in the number of guests.";
     err.style.display = "block";
     return;
@@ -531,7 +564,9 @@ async function enviar() {
     contacto: v("contacto"),
     email: v("email"),
     tourInteres: v("tour"),
-    pax: Number(v("pax")) || "",
+    pax: TOURS_ATV.includes(v("tour")) ? ((Number(v("paxCompartido"))||0) + (Number(v("paxSolo"))||0)) : (Number(v("pax")) || ""),
+    paxCompartido: TOURS_ATV.includes(v("tour")) ? (Number(v("paxCompartido"))||0) : 0,
+    paxSolo: TOURS_ATV.includes(v("tour")) ? (Number(v("paxSolo"))||0) : 0,
     edades: v("edades"),
     nadar: v("nadar"),
     peso: v("peso"),
