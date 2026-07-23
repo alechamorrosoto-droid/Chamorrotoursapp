@@ -763,7 +763,7 @@ function LeadForm({ onSave, onCancel, leadToEdit, onConvert, onDelete }) {
       React.createElement("div", null,
         React.createElement("label", { style: lbl }, "Tour de interés"),
         React.createElement("select", { value: f.tourInteres, onChange: e => h("tourInteres", e.target.value), style: inp },
-          React.createElement("option", { value: "" }, "Sin definir"),
+          React.createElement("option", { value: "" }, "Selecciona un tour"),
           ...Object.entries(TIPOS_TOUR).map(([key, t]) => React.createElement("option", { key, value: key }, t.label))
         )
       ),
