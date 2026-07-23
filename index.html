@@ -9,7 +9,7 @@
   <title>Chamorro Tours</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #070f16; font-family: -apple-system, 'Inter', system-ui, sans-serif; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+    body { background: #070f16; font-family: -apple-system, 'Inter', system-ui, sans-serif; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); overscroll-behavior: none; }
     /* En pantallas de tablet (iPad), todo se agranda un poco automáticamente
        — letras, botones, espacios — sin tener que ajustar cada uno a mano. */
     @media (min-width: 700px) and (hover: none) and (pointer: coarse) {
@@ -1038,22 +1038,6 @@ function App() {
     return meses[key] ? key : Object.keys(meses)[0];
   });
   const [panel, setPanel] = React.useState(null);
-  React.useEffect(() => {
-    if (panel) {
-      const scrollY = window.scrollY;
-      document.body.style.position = "fixed";
-      document.body.style.top = "-" + scrollY + "px";
-      document.body.style.left = "0";
-      document.body.style.right = "0";
-    } else {
-      const scrollY = document.body.style.top;
-      document.body.style.position = "";
-      document.body.style.top = "";
-      document.body.style.left = "";
-      document.body.style.right = "";
-      window.scrollTo(0, parseInt(scrollY || "0", 10) * -1);
-    }
-  }, [panel]);
   const [leads, setLeads] = React.useState(() => {
     try { const s = localStorage.getItem("chamorro_leads_data"); return s ? JSON.parse(s) : []; } catch { return []; }
   });
@@ -1367,9 +1351,9 @@ function App() {
       )
     ),
     // PANEL
-    panel ? React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "flex-end" } },
-      React.createElement("div", { style: { position: "absolute", inset: 0, background: "#000000aa" }, onClick: () => setPanel(null) }),
-      React.createElement("div", { style: { position: "relative", zIndex: 51, width: "100%", maxHeight: "95vh", background: "#0a1a24", borderTop: "1px solid #1e3a4a", borderRadius: "18px 18px 0 0", overflowY: "auto", WebkitOverflowScrolling: "touch" } },
+    panel ? React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "flex-end", paddingTop: "env(safe-area-inset-top)" } },
+      React.createElement("div", { style: { position: "absolute", inset: 0, background: "#000000aa", overscrollBehavior: "none" }, onClick: () => setPanel(null) }),
+      React.createElement("div", { style: { position: "relative", zIndex: 51, width: "100%", maxHeight: "95vh", background: "#0a1a24", borderTop: "1px solid #1e3a4a", borderRadius: "18px 18px 0 0", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain" } },
         React.createElement("div", { style: { width: 36, height: 4, background: "#1e3a4a", borderRadius: 2, margin: "12px auto 4px" } }),
         panel.tipo === "detalle" ? React.createElement(TourDetalle, { tour: panel.tour, onClose: () => setPanel(null), onDelete: deleteTour, onEdit: t => setPanel({ tipo: "form", dia: t.fecha, tour: t }),
           detalleCliente: detallesCliente.filter(d => String(d.TourId) === String(panel.tour.id)).sort((a,b) => String(b.Enviado).localeCompare(String(a.Enviado)))[0] || null,
