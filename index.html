@@ -840,7 +840,7 @@ function LeadForm({ onSave, onCancel, leadToEdit, onConvert, onDelete }) {
   );
 }
 
-function LeadsView({ leads, onAdd, onOpen, onClose, onSync }) {
+function LeadsView({ leads, onAdd, onOpen, onClose, onSync, detallesCliente, detallesVistos, onMarcarVisto, clave }) {
   const [syncing, setSyncing] = React.useState(false);
   const [msg, setMsg] = React.useState("");
   const [verConvertidos, setVerConvertidos] = React.useState(false);
@@ -870,6 +870,20 @@ function LeadsView({ leads, onAdd, onOpen, onClose, onSync }) {
       )
     ),
     msg ? React.createElement("div", { style: { fontSize: 12, color: "#94a3b8", marginBottom: 10 } }, msg) : null,
+    (() => {
+      const noVistos = (detallesCliente || []).filter(d => !detallesVistos.has(clave(d)));
+      if (noVistos.length === 0) return null;
+      return React.createElement("div", { style: { background: "#1a1030", border: "1px solid #a78bfa", borderRadius: 10, padding: 12, marginBottom: 16 } },
+        React.createElement("p", { style: { color: "#c4b5fd", fontWeight: 700, fontSize: 12, marginBottom: 8 } }, "📋 " + noVistos.length + " formulario(s) de cliente sin revisar"),
+        ...noVistos.map((d, i) => React.createElement("div", { key: i, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderTop: i > 0 ? "1px solid #2d1b4e" : "none" } },
+          React.createElement("div", { style: { fontSize: 12, color: "#e8f4f8" } },
+            React.createElement("div", null, d.Huesped || "(sin nombre)"),
+            React.createElement("div", { style: { fontSize: 10.5, color: "#94a3b8" } }, (d.Email || d.Contacto || "") + (d.TourInteres ? " · " + d.TourInteres : ""))
+          ),
+          React.createElement("button", { onClick: () => onMarcarVisto(clave(d)), style: { background: "transparent", border: "1px solid #a78bfa", color: "#c4b5fd", borderRadius: 6, padding: "4px 8px", fontSize: 10.5, cursor: "pointer" } }, "Marcar visto")
+        ))
+      );
+    })(),
     ordenados.length === 0 ? React.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: "#475569", fontSize: 13 } }, "Aún no tienes leads registrados.") : null,
     React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 } },
       ...ordenados.map(l => React.createElement("div", { key: l.id, onClick: () => onOpen(l), style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 10, padding: "12px 14px", cursor: "pointer" } },
@@ -1354,7 +1368,7 @@ function App() {
         }) : null,
         panel.tipo === "lista" ? React.createElement(DayList, { tours: panel.tours, onSelect: t => setPanel({ tipo: "detalle", tour: t }), onAdd: () => setPanel({ tipo: "form", dia: panel.dia }), onClose: () => setPanel(null) }) : null,
         panel.tipo === "form" ? React.createElement(TourForm, { onSave: panel.tour ? updateTour : (t) => addTour(t, panel.leadId), onCancel: () => setPanel(null), fechaInicial: panel.dia, tourToEdit: panel.tour, prefill: panel.prefill, forcedId: panel.leadId }) : null,
-        panel.tipo === "leads" ? React.createElement(LeadsView, { leads, onAdd: () => setPanel({ tipo: "leadForm" }), onOpen: l => setPanel({ tipo: "leadForm", lead: l }), onClose: () => setPanel(null), onSync: mergeLeadsRemotos }) : null,
+        panel.tipo === "leads" ? React.createElement(LeadsView, { leads, onAdd: () => setPanel({ tipo: "leadForm" }), onOpen: l => setPanel({ tipo: "leadForm", lead: l }), onClose: () => setPanel(null), onSync: mergeLeadsRemotos, detallesCliente, detallesVistos, onMarcarVisto: marcarDetalleVisto, clave }) : null,
         panel.tipo === "emails" ? React.createElement(EmailsView, { leads, detallesCliente, onClose: () => setPanel(null) }) : null,
         panel.tipo === "buscarTours" ? React.createElement(BuscarToursView, { meses, onSelect: t => setPanel({ tipo: "detalle", tour: t }), onClose: () => setPanel(null) }) : null,
         panel.tipo === "leadForm" ? React.createElement(LeadForm, { onSave: panel.lead ? updateLead : addLead, onCancel: () => setPanel({ tipo: "leads" }), leadToEdit: panel.lead, onConvert: convertirLead, onDelete: deleteLead }) : null,
