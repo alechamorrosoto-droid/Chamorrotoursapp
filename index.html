@@ -179,6 +179,25 @@ function compartirLinkCliente(tour) {
 }
 
 // ── CONFIRMACIÓN AL CLIENTE (ticket con QR) ─────────────────────────────────
+function enviarMetodosPago(tour, detalleCliente) {
+  const { ingreso } = calcTour(tour, tour.tipo);
+  const montoDeposito = ingreso ? Math.round(ingreso * 0.5) : null;
+  const mensaje = "🌊 Aquí tienes las opciones para pagar tu depósito"
+    + (montoDeposito ? " ($" + montoDeposito + ", 50% del total)" : "") + " con Chamorro Tours:\n\n"
+    + "💳 PayPal: https://www.paypal.me/chamorral\n"
+    + "💳 Wise: https://wise.com/pay/me/702090402c\n\n"
+    + "🏦 O por transferencia/SINPE (Costa Rica):\n"
+    + "Titular: ALEJANDRO CHAMORRO SOTO\n"
+    + "Cuenta BAC: 960963791\n"
+    + "IBAN: CR07010200009609637912\n"
+    + "SINPE Móvil: 89716121\n\n"
+    + "Cuando confirmemos que llegó el pago, tu reserva queda asegurada. ¡Gracias!";
+  const contactoCrudo = tour.contactoCliente || (detalleCliente && detalleCliente.Contacto) || "";
+  const contactoLimpio = contactoCrudo.replace(/[^\d]/g, "");
+  const waUrl = (contactoLimpio ? "https://wa.me/" + contactoLimpio : "https://wa.me/") + "?text=" + encodeURIComponent(mensaje);
+  window.open(waUrl, "_blank");
+}
+
 function enviarConfirmacionCliente(tour, detalleCliente) {
   const ti = TIPOS_TOUR[tour.tipo] || TIPOS_TOUR.personalizado;
   const params = new URLSearchParams({
@@ -681,6 +700,7 @@ function TourDetalle({ tour, onClose, onDelete, onEdit, detalleCliente, onVerDet
     ),
     React.createElement("button", { onClick: () => compartirWhatsApp(tour), style: { width: "100%", background: "#0d3320", border: "1px solid #25D366", color: "#25D366", borderRadius: 8, padding: 11, cursor: "pointer", fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "📲 Enviar al guía por WhatsApp"),
     React.createElement("button", { onClick: () => { enviarConfirmacionCliente(tour, detalleCliente); onMarkTicketEnviado(tour); }, style: { width: "100%", background: "#1a1030", border: "1px solid #a78bfa", color: "#c4b5fd", borderRadius: 8, padding: 11, cursor: "pointer", fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "🎫 Enviar confirmación al cliente"),
+    React.createElement("button", { onClick: () => enviarMetodosPago(tour, detalleCliente), style: { width: "100%", background: "#1a2a10", border: "1px solid #84cc16", color: "#bef264", borderRadius: 8, padding: 11, cursor: "pointer", fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "💳 Enviar métodos de pago"),
     React.createElement("button", { onClick: () => enviarConfirmacionPorCorreo(tour, detalleCliente, () => onMarkTicketEnviado(tour)), style: { width: "100%", background: "#1a1030", border: "1px solid #a78bfa", color: "#c4b5fd", borderRadius: 8, padding: 11, cursor: "pointer", fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "✉️ Enviar confirmación por correo"),
     React.createElement("button", { onClick: () => compartirLinkCliente(tour), style: { width: "100%", background: "#0a1e2a", border: "1px solid #0ea5e9", color: "#7ec8e3", borderRadius: 8, padding: 11, cursor: "pointer", fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "📩 Pedirle datos al cliente (vía PM)"),
     React.createElement("div", { style: { display: "flex", gap: 10 } },
@@ -954,6 +974,7 @@ function LeadsView({ leads, onAdd, onOpen, onClose, onSync, detallesCliente, det
             l.email ? React.createElement("div", { style: { fontSize: 11, color: "#94a3b8", marginTop: 2 } }, "✉️ " + l.email) : null,
             l.horaEstimada ? React.createElement("div", { style: { fontSize: 11, color: "#94a3b8", marginTop: 2 } }, "🕐 " + l.horaEstimada) : null,
             l.emailPM ? React.createElement("div", { style: { fontSize: 11, color: "#94a3b8", marginTop: 2 } }, "🏠 " + l.emailPM) : null,
+            l.metodoPago ? React.createElement("div", { style: { fontSize: 10.5, color: l.metodoPago === "Efectivo" ? "#f59e0b" : "#7ec8e3", marginTop: 3, fontWeight: 600 } }, "💳 Paga con: " + l.metodoPago) : null,
             l.waiverAceptado === "Sí" ? React.createElement("div", { style: { fontSize: 10.5, color: "#4ade80", marginTop: 3, fontWeight: 600 } }, "✅ Waiver aceptado") : null,
             l.alergias ? React.createElement("div", { style: { fontSize: 11, color: "#f59e0b", marginTop: 3, fontWeight: 600 } }, "🚨 " + l.alergias) : null
           ),

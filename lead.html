@@ -227,6 +227,15 @@
           </label>
           <details class="policy-details" id="metodo-pago-block" style="margin-top: 14px;" open>
             <summary><div class="eyebrow">Método de pago</div></summary>
+            <label style="margin-top: 10px;">¿Cómo vas a pagar el depósito del 50%? <span class="req">*</span></label>
+            <select id="metodoPago" onchange="actualizarNotaEfectivo()">
+              <option value="">Selecciona una opción</option>
+              <option value="PayPal">PayPal</option>
+              <option value="Wise">Wise</option>
+              <option value="Transferencia/SINPE">Transferencia bancaria / SINPE</option>
+              <option value="Efectivo">Efectivo</option>
+            </select>
+            <p class="pay-note" id="nota-efectivo" style="display:none;">⚠️ El pago en efectivo se coordina en persona con Alejandro. Por favor ten en cuenta que tu reserva se confirma una vez que recibamos el pago — mientras tanto, el cupo queda pendiente. Si prefieres asegurarlo de inmediato, puedes usar cualquiera de las opciones digitales de abajo.</p>
             <div class="pay-links" style="margin-top: 10px;">
               <a class="pay-btn" href="https://www.paypal.me/chamorral" target="_blank" rel="noopener">Pagar con PayPal</a>
               <a class="pay-btn" href="https://wise.com/pay/me/702090402c" target="_blank" rel="noopener">Pagar con Wise</a>
@@ -277,6 +286,29 @@
       </div>
       <h2 class="display">Solicitud enviada</h2>
       <p id="ok-msg">Gracias. Alejandro recibirá la información y se pondrá en contacto para coordinar el tour.</p>
+
+      <div class="waiver-block" id="recordatorio-pago-pane" style="display:none; text-align:left;">
+        <div class="eyebrow">Recuerda pagar tu depósito</div>
+        <p id="recordatorio-metodo" style="font-size:13px; color:var(--ink); margin-bottom:10px;"></p>
+        <div class="pay-links">
+          <a class="pay-btn" href="https://www.paypal.me/chamorral" target="_blank" rel="noopener">Pagar con PayPal</a>
+          <a class="pay-btn" href="https://wise.com/pay/me/702090402c" target="_blank" rel="noopener">Pagar con Wise</a>
+        </div>
+        <div class="bank-box">
+          <div class="bank-title">O por transferencia bancaria local (BAC / SINPE)</div>
+          <div class="bank-row">
+            <span class="bank-label">Cuenta BAC</span>
+            <span class="bank-value" id="bac-account-ok">960963791</span>
+            <button type="button" class="bank-copy" onclick="copiarDato('bac-account-ok', this)">Copiar</button>
+          </div>
+          <div class="bank-row">
+            <span class="bank-label">SINPE Móvil</span>
+            <span class="bank-value" id="sinpe-ok">89716121</span>
+            <button type="button" class="bank-copy" onclick="copiarDato('sinpe-ok', this)">Copiar</button>
+          </div>
+        </div>
+        <p class="pay-note">Tu reserva queda asegurada cuando confirmemos que recibimos tu depósito.</p>
+      </div>
 
       <div class="client-link" id="link-cliente-pane">
         <div class="eyebrow">Un paso más</div>
@@ -331,6 +363,11 @@ function actualizarPrecioEstimado() {
   }
   box.innerHTML = texto;
   box.style.display = "block";
+}
+
+function actualizarNotaEfectivo() {
+  const val = document.getElementById("metodoPago").value;
+  document.getElementById("nota-efectivo").style.display = val === "Efectivo" ? "block" : "none";
 }
 
 function actualizarCamposPax() {
@@ -521,6 +558,11 @@ async function enviar() {
     err.style.display = "block";
     return;
   }
+  if (!ES_VIA_ALGUIEN && !document.getElementById("metodoPago").value) {
+    err.textContent = "Por favor indica cómo vas a pagar el depósito del 50%.";
+    err.style.display = "block";
+    return;
+  }
   if (!ES_VIA_ALGUIEN && !document.getElementById("waiver").checked) {
     err.textContent = "Por favor confirma que leíste y aceptas la exención de responsabilidad.";
     err.style.display = "block";
@@ -558,6 +600,7 @@ async function enviar() {
     waiverAceptado: !ES_VIA_ALGUIEN,
     waiverFecha: new Date().toISOString(),
     politicaAceptada: !ES_VIA_ALGUIEN,
+    metodoPago: v("metodoPago"),
     unidad: v("unidad"),
     contacto: v("contacto"),
     email: v("email"),
@@ -598,6 +641,12 @@ async function enviar() {
       document.getElementById("nota-wa").textContent = contactoLimpio
         ? "Se va a abrir el chat de WhatsApp con el número que pusiste arriba (" + v("contacto") + ")."
         : "No pusiste un número de contacto, así que WhatsApp te va a pedir elegir tú mismo a quién mandárselo.";
+    } else {
+      const metodo = v("metodoPago");
+      document.getElementById("recordatorio-pago-pane").style.display = "block";
+      document.getElementById("recordatorio-metodo").textContent = metodo === "Efectivo"
+        ? "Elegiste pagar en efectivo — coordina con Alejandro por WhatsApp para acordar dónde y cuándo. Ten en cuenta que tu reserva quedará confirmada una vez que recibamos el pago. Si prefieres asegurar tu cupo de inmediato, aquí abajo tienes las opciones digitales."
+        : "Elegiste pagar por " + metodo + " — aquí tienes de nuevo los datos, por si los necesitas:";
     }
     window.scrollTo(0, 0);
 
@@ -623,6 +672,9 @@ function reiniciar() {
   if (document.getElementById("pmReferente")) document.getElementById("pmReferente").value = "";
   document.getElementById("waiver").checked = false;
   document.getElementById("politica").checked = false;
+  document.getElementById("metodoPago").value = "";
+  document.getElementById("nota-efectivo").style.display = "none";
+  document.getElementById("recordatorio-pago-pane").style.display = "none";
   actualizarCamposPax();
   document.getElementById("ok-pane").style.display = "none";
   document.getElementById("form-pane").style.display = "block";
