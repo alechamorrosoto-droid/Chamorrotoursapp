@@ -843,7 +843,10 @@ function LeadForm({ onSave, onCancel, leadToEdit, onConvert, onDelete }) {
 function LeadsView({ leads, onAdd, onOpen, onClose, onSync }) {
   const [syncing, setSyncing] = React.useState(false);
   const [msg, setMsg] = React.useState("");
-  const ordenados = [...leads].sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
+  const [verConvertidos, setVerConvertidos] = React.useState(false);
+  const convertidos = leads.filter(l => l.estado === "Convertido");
+  const visibles = verConvertidos ? leads : leads.filter(l => l.estado !== "Convertido");
+  const ordenados = [...visibles].sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
 
   async function sincronizar() {
     setSyncing(true); setMsg("");
@@ -861,6 +864,7 @@ function LeadsView({ leads, onAdd, onOpen, onClose, onSync }) {
     React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } },
       React.createElement("p", { style: { color: "#7ec8e3", fontWeight: 700, fontSize: 13, letterSpacing: 1, textTransform: "uppercase" } }, "Leads de Property Managers"),
       React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center" } },
+        convertidos.length > 0 ? React.createElement("button", { onClick: () => setVerConvertidos(v => !v), style: { background: "transparent", border: "1px solid #1e3a4a", color: "#7ec8e3", borderRadius: 8, padding: "6px 10px", fontSize: 11, cursor: "pointer" } }, verConvertidos ? "Ocultar convertidos" : "Ver convertidos (" + convertidos.length + ")") : null,
         React.createElement("button", { onClick: sincronizar, disabled: syncing, style: { background: "#0f2027", border: "1px solid #1e3a4a", borderRadius: 8, padding: "6px 10px", color: "#7ec8e3", fontSize: 12, fontWeight: 700, cursor: "pointer" } }, syncing ? "⏳" : "🔄 Actualizar"),
         React.createElement("button", { onClick: onClose, style: { background: "transparent", border: "none", color: "#475569", fontSize: 22, cursor: "pointer" } }, "✕")
       )
@@ -1010,8 +1014,20 @@ function App() {
   });
   const [panel, setPanel] = React.useState(null);
   React.useEffect(() => {
-    document.body.style.overflow = panel ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    if (panel) {
+      const scrollY = window.scrollY;
+      document.body.style.position = "fixed";
+      document.body.style.top = "-" + scrollY + "px";
+      document.body.style.left = "0";
+      document.body.style.right = "0";
+    } else {
+      const scrollY = document.body.style.top;
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.left = "";
+      document.body.style.right = "";
+      window.scrollTo(0, parseInt(scrollY || "0", 10) * -1);
+    }
   }, [panel]);
   const [leads, setLeads] = React.useState(() => {
     try { const s = localStorage.getItem("chamorro_leads_data"); return s ? JSON.parse(s) : []; } catch { return []; }
@@ -1050,12 +1066,26 @@ function App() {
   function save(key, updated) { localStorage.setItem("chamorro_tours_data", JSON.stringify(updated)); return updated; }
   function mesKeyDeFecha(fecha) { const [y, m] = (fecha || "").split("-"); return y && m ? y + "-" + m : null; }
   function addTourSilencioso(tour, leadId) {
-    const k = mesKeyDeFecha(tour.fecha);
+    const keyDestino = mesKeyDeFecha(tour.fecha);
     setMeses(p => {
       let base = p;
-      if (k && !base[k]) { const [y, m] = k.split("-").map(Number); base = { ...base, [k]: crearMes(y, m) }; }
-      const key = (k && base[k]) ? k : mesActivo;
-      return save(key, { ...base, [key]: { ...base[key], tours: [...base[key].tours, tour] } });
+      if (keyDestino && !base[keyDestino]) { const [y, m] = keyDestino.split("-").map(Number); base = { ...base, [keyDestino]: crearMes(y, m) }; }
+      const keyValido = (keyDestino && base[keyDestino]) ? keyDestino : mesActivo;
+      // Busca si YA existe un tour con este mismo ID en cualquier mes (por
+      // ejemplo, uno creado automáticamente desde el mismo lead) — si existe,
+      // se actualiza en su lugar en vez de agregar uno duplicado.
+      let keyOrigen = null;
+      for (const k in base) { if ((base[k].tours || []).some(t => t.id === tour.id)) { keyOrigen = k; break; } }
+      let actualizado;
+      if (keyOrigen === keyValido) {
+        actualizado = { ...base, [keyValido]: { ...base[keyValido], tours: base[keyValido].tours.map(t => t.id === tour.id ? tour : t) } };
+      } else {
+        actualizado = { ...base, [keyValido]: { ...base[keyValido], tours: [...base[keyValido].tours, tour] } };
+        if (keyOrigen) {
+          actualizado[keyOrigen] = { ...base[keyOrigen], tours: base[keyOrigen].tours.filter(t => t.id !== tour.id) };
+        }
+      }
+      return save(keyValido, actualizado);
     });
     syncTourASheets(tour);
     if (leadId) setLeads(p => saveLeads(p.map(l => l.id === leadId ? { ...l, estado: "Convertido" } : l)));
