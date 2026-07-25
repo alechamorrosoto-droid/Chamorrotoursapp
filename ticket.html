@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Tu tour — Chamorro Tours</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --marine: #0E3B43;
+    --marine-deep: #082A30;
+    --coral: #F2765A;
+    --sand: #F5E6C8;
+    --paper: #FBF7EE;
+    --ink: #143238;
+    --muted: #6C8A8E;
+    --line: rgba(20,50,56,0.14);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 20% -10%, rgba(242,118,90,0.25), transparent 45%),
+      linear-gradient(180deg, var(--marine) 0%, var(--marine-deep) 100%);
+    font-family:'Work Sans', sans-serif;
+    color:var(--ink);
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    padding:24px 16px 60px;
+  }
+  .wrap{width:100%; max-width:420px;}
+  .brand{
+    text-align:center;
+    color:var(--sand);
+    margin-bottom:22px;
+  }
+  .brand .name{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:26px;
+    margin-top:4px;
+    letter-spacing:0.5px;
+  }
+  .brand .tag{
+    font-size:12px;
+    color:var(--muted);
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    margin-top:2px;
+  }
+
+  .ticket{
+    background:var(--paper);
+    border-radius:22px;
+    box-shadow:0 24px 60px rgba(0,0,0,0.35);
+    overflow:hidden;
+    position:relative;
+    animation: rise 0.6s cubic-bezier(.2,.8,.2,1) both;
+  }
+  @keyframes rise{
+    from{opacity:0; transform:translateY(18px);}
+    to{opacity:1; transform:translateY(0);}
+  }
+
+  .top{
+    padding:26px 26px 22px;
+    position:relative;
+  }
+  .status{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    background:rgba(91,140,90,0.12);
+    color:#3F6B3E;
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    padding:5px 10px 5px 8px;
+    border-radius:100px;
+    margin-bottom:16px;
+  }
+  .status::before{
+    content:'';
+    width:6px;height:6px;border-radius:50%;
+    background:#3F6B3E;
+    display:inline-block;
+  }
+
+  .tour-name{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:28px;
+    line-height:1.15;
+    margin:0 0 6px;
+  }
+  .tour-sub{
+    font-size:13px;
+    color:var(--muted);
+    margin-bottom:20px;
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px 12px;
+    margin-top:6px;
+  }
+  .field{
+    min-width:0;
+  }
+  .field .k{
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:1.2px;
+    color:var(--muted);
+    margin-bottom:4px;
+  }
+  .field .v{
+    font-size:15px;
+    font-weight:500;
+    overflow-wrap:break-word;
+    word-break:break-word;
+  }
+  .field .v-link{
+    color:var(--ink);
+    text-decoration:underline;
+    text-decoration-color:var(--line);
+    text-underline-offset:3px;
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    overflow-wrap:break-word;
+    word-break:break-word;
+    max-width:100%;
+  }
+  .field .v-link::after{
+    content:'↗';
+    font-size:11px;
+    color:var(--coral);
+    flex-shrink:0;
+  }
+  .field .v.mono{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:14px;
+  }
+
+  .perf{
+    position:relative;
+    height:34px;
+    background:
+      linear-gradient(90deg, var(--marine-deep) 0 0) no-repeat;
+  }
+  .perf svg{display:block; width:100%; height:34px;}
+  .notch{
+    position:absolute; top:-16px; width:32px; height:32px; border-radius:50%;
+    background:var(--marine-deep);
+  }
+  .notch.left{left:-16px;}
+  .notch.right{right:-16px;}
+
+  .bottom{
+    padding:22px 26px 18px;
+    text-align:center;
+  }
+  .qr-box{
+    background:#fff;
+    display:inline-block;
+    padding:14px;
+    border-radius:16px;
+    box-shadow:0 6px 18px rgba(20,50,56,0.08);
+  }
+  #qrcode{line-height:0;}
+  .code{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    letter-spacing:2px;
+    color:var(--muted);
+    margin-top:14px;
+  }
+  .guide-line{
+    margin-top:18px;
+    font-size:13px;
+    color:var(--muted);
+  }
+  .guide-line b{color:var(--ink); font-weight:600;}
+
+  .staff-box{
+    margin-top:16px;
+    text-align:left;
+    background:rgba(242,118,90,0.08);
+    border:1px dashed var(--coral);
+    border-radius:12px;
+    padding:12px 14px;
+  }
+  .staff-title{
+    font-size:10px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--coral);
+    font-weight:700;
+    margin-bottom:6px;
+  }
+  .staff-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:13px;
+    color:var(--ink);
+    padding:2px 0;
+  }
+  .staff-row span{color:var(--muted);}
+  .staff-row b{font-weight:700;}
+
+  .actions{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    margin-top:22px;
+    padding:0 4px;
+  }
+  .btn{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    padding:14px 18px;
+    border-radius:14px;
+    font-size:15px;
+    font-weight:600;
+    text-decoration:none;
+    border:none;
+    cursor:pointer;
+    font-family:'Work Sans', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn.primary{
+    background:var(--coral);
+    color:#fff;
+  }
+  .btn.secondary{
+    background:transparent;
+    color:var(--sand);
+    border:1px solid rgba(245,230,200,0.35);
+  }
+  .btn:active{transform:scale(0.98);}
+  .btn:focus-visible{outline:2px solid var(--coral); outline-offset:2px;}
+
+  .policy{
+    width:100%;
+    max-width:420px;
+    margin-top:18px;
+    padding:2px 4px;
+  }
+  .policy-teaser{
+    color:var(--sand);
+    font-size:13px;
+    font-weight:600;
+    line-height:1.5;
+    margin:0 0 6px;
+  }
+  .policy-teaser b{color:var(--coral);}
+  .policy-details summary{
+    list-style:none;
+    cursor:pointer;
+    color:rgba(245,230,200,0.65);
+    font-size:12.5px;
+    font-weight:600;
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    padding:2px 0;
+    -webkit-tap-highlight-color: transparent;
+    text-decoration:underline;
+    text-underline-offset:3px;
+  }
+  .policy-details summary::-webkit-details-marker{display:none;}
+  .policy-details summary::after{
+    content:'↓';
+    text-decoration:none;
+    font-size:11px;
+  }
+  .policy-details[open] summary::after{content:'↑';}
+  .policy-body{
+    color:rgba(245,230,200,0.72);
+    font-size:12.5px;
+    line-height:1.65;
+    padding:10px 2px 4px;
+  }
+
+  .packing{
+    padding:2px 0;
+    margin-top:18px;
+    margin-bottom:2px;
+  }
+  .packing summary{
+    list-style:none;
+    cursor:pointer;
+    color:var(--ink);
+    font-size:13px;
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:6px 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .packing summary::-webkit-details-marker{display:none;}
+  .packing summary #packingLabel{
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .packing summary #packingLabel::before{
+    content:'+';
+    font-family:'IBM Plex Mono', monospace;
+    font-size:15px;
+    color:var(--coral);
+  }
+  .packing[open] summary #packingLabel::before{content:'–';}
+  .tour-tag{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    font-weight:600;
+    color:var(--ink);
+    background:var(--sand);
+    border:1px solid var(--line);
+    padding:4px 10px;
+    border-radius:100px;
+    white-space:nowrap;
+  }
+  .packing-list{
+    margin:6px 0 4px 4px;
+    padding-left:18px;
+    color:var(--muted);
+    font-size:12.5px;
+    line-height:1.7;
+  }
+  .packing-list li{margin-bottom:3px;}
+
+  .footnote{
+    text-align:center;
+    color:rgba(245,230,200,0.55);
+    font-size:11.5px;
+    margin-top:24px;
+    line-height:1.6;
+  }
+  .footnote a{color:var(--sand);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="brand">
+    <div class="name">Chamorro Tours</div>
+    <div class="tag">Puerto Viejo · Costa Rica</div>
+  </div>
+
+  <div class="ticket">
+    <div class="top">
+      <span class="status">Confirmado</span>
+      <div class="tour-name" id="tourName">Tour</div>
+      <div class="tour-sub" id="tourGuestLine">Reserva</div>
+
+      <div class="grid">
+        <div class="field">
+          <div class="k">Fecha</div>
+          <div class="v" id="tourDate">—</div>
+        </div>
+        <div class="field">
+          <div class="k">Hora de salida</div>
+          <div class="v" id="tourTime">—</div>
+        </div>
+        <div class="field">
+          <div class="k">Punto de encuentro</div>
+          <a class="v v-link" id="tourMeet" href="#" target="_blank" rel="noopener">—</a>
+        </div>
+        <div class="field">
+          <div class="k">Guía asignado</div>
+          <div class="v" id="tourGuide">—</div>
+        </div>
+      </div>
+
+      <details class="packing">
+        <summary id="packingSummary">
+          <span id="packingLabel">What to bring</span>
+          <span class="tour-tag" id="tourTag"></span>
+        </summary>
+        <ul class="packing-list" id="packingList"></ul>
+      </details>
+    </div>
+
+    <div class="perf">
+      <div class="notch left"></div>
+      <div class="notch right"></div>
+      <svg viewBox="0 0 400 34" preserveAspectRatio="none">
+        <line x1="16" y1="17" x2="384" y2="17" stroke="#143238" stroke-opacity="0.15" stroke-width="2" stroke-dasharray="6,7"/>
+      </svg>
+    </div>
+
+    <div class="bottom">
+      <div class="qr-box">
+        <div id="qrcode"></div>
+      </div>
+      <div class="code" id="tourCode">CT-0000</div>
+      <div class="guide-line">Presenta este código al llegar con <b id="guideInline">tu guía</b></div>
+
+      <div class="staff-box" id="staffBox" style="display:none;">
+        <div class="staff-title">Solo para el guía</div>
+        <div class="staff-row"><span>Estado de pago</span><b id="staffEstado">—</b></div>
+        <div class="staff-row" id="staffPendienteRow" style="display:none;">
+          <span>Pendiente por cobrar</span><b id="staffPendiente">—</b>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" onclick="addToCalendar()">Agregar a mi calendario</button>
+    <a class="btn secondary" href="#" onclick="shareTicket(event)">Guardar / compartir ticket</a>
+  </div>
+
+  <div class="policy">
+    <p class="policy-teaser" id="policyTeaser"></p>
+    <details class="policy-details">
+      <summary id="policySummary">Leer política completa</summary>
+      <div class="policy-body" id="policyBody"></div>
+    </details>
+  </div>
+
+  <div class="footnote">
+    ¿Dudas sobre tu tour? Escríbenos por WhatsApp y ten a mano tu código<br>
+    <span id="codeInline">CT-0000</span>
+  </div>
+
+</div>
+
+<script>
+  // ----- Duración por tipo de tour, igual que en tu Apps Script -----
+  const DURACION_HORAS = { kayaking:2, dolphin:3, snorkeling:2, chocolate:4.5, atv1:5, atv2:5 };
+  const CATEGORIA = { kayaking:'Kayaking', dolphin:'Dolphin Tour', snorkeling:'Snorkeling', chocolate:'Chocolate & Waterfalls', atv1:'ATV · 1 Waterfall', atv2:'ATV · 2 Waterfalls' };
+
+  // ----- Política de cancelación (edita aquí si cambian las reglas) -----
+  const POLITICA = { depositoPct: 50, ventanaReembolsoHoras: 48, ventanaReprogramarHoras: 24 };
+
+  // ----- Qué llevar, por tipo de tour y por idioma -----
+  const WHATTOBRING = {
+    kayaking: {
+      es:["Traje de baño","Bloqueador solar biodegradable","Zapatos de agua o sandalias con correa","Cambio de ropa seca","Toalla pequeña","Bolsa o funda impermeable para el celular"],
+      en:["Swimsuit","Reef-safe sunscreen","Water shoes or sandals with a strap","A change of dry clothes","Small towel","Waterproof bag or phone case"],
+      fr:["Maillot de bain","Crème solaire respectueuse des récifs","Chaussures d'eau ou sandales avec sangle","Vêtements de rechange secs","Petite serviette","Sac ou pochette étanche pour téléphone"],
+      it:["Costume da bagno","Crema solare eco-compatibile","Scarpe da acqua o sandali con cinturino","Cambio di vestiti asciutti","Asciugamano piccolo","Sacca o custodia impermeabile per il telefono"],
+      de:["Badeanzug/Badehose","Riffverträglicher Sonnenschutz","Wasserschuhe oder Sandalen mit Riemen","Trockene Wechselkleidung","Kleines Handtuch","Wasserdichte Tasche oder Handyhülle"]
+    },
+    dolphin: {
+      es:["Traje de baño","Bloqueador solar","Sombrero y lentes de sol (con cordón)","Chaqueta ligera o rompevientos","Medicamento para el mareo si lo necesitas","Funda impermeable para el celular"],
+      en:["Swimsuit","Sunscreen","Hat and sunglasses (with a strap)","Light jacket or windbreaker","Motion sickness medication if needed","Waterproof phone case"],
+      fr:["Maillot de bain","Crème solaire","Chapeau et lunettes de soleil (avec cordon)","Veste légère ou coupe-vent","Médicament contre le mal des transports si besoin","Pochette étanche pour téléphone"],
+      it:["Costume da bagno","Crema solare","Cappello e occhiali da sole (con laccio)","Giacca leggera o antivento","Farmaco per il mal di mare se necessario","Custodia impermeabile per il telefono"],
+      de:["Badeanzug/Badehose","Sonnenschutz","Hut und Sonnenbrille (mit Band)","Leichte Jacke oder Windjacke","Reisekrankheitstabletten, falls nötig","Wasserdichte Handyhülle"]
+    },
+    snorkeling: {
+      es:["Traje de baño","Bloqueador solar biodegradable","Zapatos de agua o sandalias","Toalla","Cambio de ropa seca","Funda impermeable para el celular"],
+      en:["Swimsuit","Reef-safe sunscreen","Water shoes or sandals","Towel","A change of dry clothes","Waterproof phone case"],
+      fr:["Maillot de bain","Crème solaire respectueuse des récifs","Chaussures d'eau ou sandales","Serviette","Vêtements de rechange secs","Pochette étanche pour téléphone"],
+      it:["Costume da bagno","Crema solare eco-compatibile","Scarpe da acqua o sandali","Asciugamano","Cambio di vestiti asciutti","Custodia impermeabile per il telefono"],
+      de:["Badeanzug/Badehose","Riffverträglicher Sonnenschutz","Wasserschuhe oder Sandalen","Handtuch","Trockene Wechselkleidung","Wasserdichte Handyhülle"]
+    },
+    chocolate: {
+      es:["Zapatos cerrados y cómodos","Traje de baño (para la catarata)","Toalla","Repelente de insectos","Chaqueta ligera para la lluvia","Efectivo para souvenirs"],
+      en:["Comfortable closed-toe shoes","Swimsuit (for the waterfall)","Towel","Insect repellent","Light rain jacket","Cash for souvenirs"],
+      fr:["Chaussures fermées confortables","Maillot de bain (pour la cascade)","Serviette","Répulsif anti-insectes","Veste de pluie légère","Espèces pour les souvenirs"],
+      it:["Scarpe chiuse comode","Costume da bagno (per la cascata)","Asciugamano","Repellente per insetti","Giacca antipioggia leggera","Contanti per i souvenir"],
+      de:["Bequeme geschlossene Schuhe","Badeanzug/Badehose (für den Wasserfall)","Handtuch","Insektenschutzmittel","Leichte Regenjacke","Bargeld für Souvenirs"]
+    },
+    atv1: {
+      es:["Zapatos cerrados (obligatorio)","Ropa que no te importe ensuciar o mojar","Traje de baño (para la catarata)","Toalla","Bloqueador solar y repelente de insectos","Cambio de ropa seca"],
+      en:["Closed-toe shoes (required)","Clothes you don't mind getting wet or dirty","Swimsuit (for the waterfall)","Towel","Sunscreen and insect repellent","A change of dry clothes"],
+      fr:["Chaussures fermées (obligatoire)","Vêtements que vous ne craignez pas de salir ou mouiller","Maillot de bain (pour la cascade)","Serviette","Crème solaire et répulsif anti-insectes","Vêtements de rechange secs"],
+      it:["Scarpe chiuse (obbligatorie)","Vestiti che non ti dispiace sporcare o bagnare","Costume da bagno (per la cascata)","Asciugamano","Crema solare e repellente per insetti","Cambio di vestiti asciutti"],
+      de:["Geschlossene Schuhe (Pflicht)","Kleidung, die schmutzig oder nass werden darf","Badeanzug/Badehose (für den Wasserfall)","Handtuch","Sonnenschutz und Insektenschutzmittel","Trockene Wechselkleidung"]
+    },
+    default: {
+      es:["Ropa cómoda para actividades al aire libre","Bloqueador solar","Botella de agua","Traje de baño (por si acaso)","Toalla","Cámara o celular"],
+      en:["Comfortable clothes for the outdoors","Sunscreen","Water bottle","Swimsuit (just in case)","Towel","Camera or phone"],
+      fr:["Vêtements confortables pour l'extérieur","Crème solaire","Bouteille d'eau","Maillot de bain (au cas où)","Serviette","Appareil photo ou téléphone"],
+      it:["Abbigliamento comodo per attività all'aperto","Crema solare","Bottiglia d'acqua","Costume da bagno (per sicurezza)","Asciugamano","Fotocamera o telefono"],
+      de:["Bequeme Kleidung für draußen","Sonnenschutz","Wasserflasche","Badeanzug/Badehose (zur Sicherheit)","Handtuch","Kamera oder Handy"]
+    }
+  };
+  WHATTOBRING.atv2 = WHATTOBRING.atv1; // mismo tipo de actividad
+
+  // ----- Traducciones de la interfaz -----
+  const LANGS = {
+    es: {
+      locale:'es-CR',
+      confirmado:'Confirmado',
+      kFecha:'Fecha', kHora:'Hora de salida', kPunto:'Punto de encuentro', kGuia:'Guía asignado',
+      reservaDe:(c,p)=>`Reserva de ${c}${p ? ` · ${p} personas` : ""}`,
+      presentaCodigo:(g)=>`Presenta este código al llegar con <b>${g}</b>`,
+      btnCal:'Agregar a mi calendario', btnShare:'Guardar / compartir ticket',
+      footnote:'¿Dudas sobre tu tour? Escríbenos por WhatsApp y ten a mano tu código',
+      alertSinFecha:'Todavía no hay fecha confirmada para este tour.',
+      alertLinkCopiado:'Link copiado. Pégalo donde quieras compartirlo.',
+      alertGuardarImagen:'Mantén presionada la pantalla para guardar como imagen, o usa el botón de compartir de tu navegador.',
+      shareText:(n,d,c)=>`Mi tour: ${n} el ${d}. Código: ${c}`,
+      tuGuia:'tu guía', porConfirmar:'Por confirmar', porAsignar:'Por asignar',
+      packingTitle:'Qué llevar',
+      policyTeaser:(pct,h48,h24)=>`Depósito del <b>${pct}%</b> · cancelar con menos de <b>${h48}h</b> pierde el depósito; con menos de <b>${h24}h</b> no se puede reprogramar.`,
+      policyReadMore:'Leer política completa',
+      policyBody:(pct,h48,h24)=>`Se requiere un depósito del ${pct}% para confirmar la reserva. Si cancelas con ${h48} horas o más de anticipación, te devolvemos el depósito completo. Si cancelas entre ${h24} y ${h48} horas antes, el depósito no es reembolsable, pero puedes reprogramar la fecha o cambiar de tour sin costo adicional. Si cancelas con menos de ${h24} horas de anticipación, se pierde el depósito y no hay opción de reprogramar ni cambiar de tour. Si nosotros cancelamos por mal clima o condiciones del mar, la fecha se mueve o se cambia por otro tour, sin ninguna penalidad para ti.`
+    },
+    en: {
+      locale:'en-US',
+      confirmado:'Confirmed',
+      kFecha:'Date', kHora:'Departure time', kPunto:'Meeting point', kGuia:'Assigned guide',
+      reservaDe:(c,p)=>`Booking for ${c}${p ? ` · ${p} guests` : ""}`,
+      presentaCodigo:(g)=>`Show this code when you arrive with <b>${g}</b>`,
+      btnCal:'Add to my calendar', btnShare:'Save / share ticket',
+      footnote:"Questions about your tour? Message us on WhatsApp and have your code ready",
+      alertSinFecha:"There's no confirmed date for this tour yet.",
+      alertLinkCopiado:"Link copied. Paste it wherever you'd like to share it.",
+      alertGuardarImagen:"Press and hold the screen to save it as an image, or use your browser's share button.",
+      shareText:(n,d,c)=>`My tour: ${n} on ${d}. Code: ${c}`,
+      tuGuia:'your guide', porConfirmar:'To be confirmed', porAsignar:'To be assigned',
+      packingTitle:'What to bring',
+      policyTeaser:(pct,h48,h24)=>`<b>${pct}%</b> deposit · cancel under <b>${h48}h</b> and the deposit is lost; under <b>${h24}h</b>, no reschedule.`,
+      policyReadMore:'Read full policy',
+      policyBody:(pct,h48,h24)=>`A ${pct}% deposit is required to confirm your booking. Cancel ${h48} hours or more in advance and your deposit is fully refunded. Cancel between ${h24} and ${h48} hours in advance and the deposit is non-refundable, but you can reschedule to another date or switch tours at no extra cost. Cancel with less than ${h24} hours' notice and the deposit is forfeited, with no option to reschedule or switch. If we cancel due to weather or sea conditions, your tour is rescheduled or switched at no penalty to you.`
+    },
+    fr: {
+      locale:'fr-FR',
+      confirmado:'Confirmé',
+      kFecha:'Date', kHora:'Heure de départ', kPunto:'Point de rendez-vous', kGuia:'Guide assigné',
+      reservaDe:(c,p)=>`Réservation de ${c}${p ? ` · ${p} personnes` : ""}`,
+      presentaCodigo:(g)=>`Présentez ce code à votre arrivée avec <b>${g}</b>`,
+      btnCal:'Ajouter à mon calendrier', btnShare:'Enregistrer / partager le billet',
+      footnote:'Des questions sur votre tour ? Écrivez-nous sur WhatsApp et gardez votre code à portée de main',
+      alertSinFecha:'Aucune date confirmée pour ce tour pour le moment.',
+      alertLinkCopiado:'Lien copié. Collez-le où vous voulez le partager.',
+      alertGuardarImagen:"Appuyez longuement sur l'écran pour enregistrer une image, ou utilisez le bouton de partage de votre navigateur.",
+      shareText:(n,d,c)=>`Mon tour : ${n} le ${d}. Code : ${c}`,
+      tuGuia:'votre guide', porConfirmar:'À confirmer', porAsignar:'À assigner',
+      packingTitle:'Quoi apporter',
+      policyTeaser:(pct,h48,h24)=>`Acompte de <b>${pct}%</b> · annulation à moins de <b>${h48}h</b> : acompte perdu ; à moins de <b>${h24}h</b> : aucun report possible.`,
+      policyReadMore:'Lire la politique complète',
+      policyBody:(pct,h48,h24)=>`Un acompte de ${pct}% est requis pour confirmer la réservation. En cas d'annulation ${h48} heures ou plus à l'avance, l'acompte est intégralement remboursé. En cas d'annulation entre ${h24} et ${h48} heures à l'avance, l'acompte n'est pas remboursable, mais vous pouvez reporter la date ou changer de tour sans frais supplémentaires. En cas d'annulation moins de ${h24} heures à l'avance, l'acompte est perdu, sans possibilité de report ni de changement. Si nous annulons pour cause de météo ou de conditions de mer, votre tour est reporté ou changé sans aucune pénalité.`
+    },
+    it: {
+      locale:'it-IT',
+      confirmado:'Confermato',
+      kFecha:'Data', kHora:'Orario di partenza', kPunto:"Punto d'incontro", kGuia:'Guida assegnata',
+      reservaDe:(c,p)=>`Prenotazione di ${c}${p ? ` · ${p} persone` : ""}`,
+      presentaCodigo:(g)=>`Mostra questo codice all'arrivo con <b>${g}</b>`,
+      btnCal:'Aggiungi al calendario', btnShare:'Salva / condividi il biglietto',
+      footnote:'Domande sul tuo tour? Scrivici su WhatsApp e tieni a portata il tuo codice',
+      alertSinFecha:'Non c\'è ancora una data confermata per questo tour.',
+      alertLinkCopiado:'Link copiato. Incollalo dove vuoi condividerlo.',
+      alertGuardarImagen:'Tieni premuto lo schermo per salvare come immagine, oppure usa il pulsante di condivisione del browser.',
+      shareText:(n,d,c)=>`Il mio tour: ${n} il ${d}. Codice: ${c}`,
+      tuGuia:'la tua guida', porConfirmar:'Da confermare', porAsignar:'Da assegnare',
+      packingTitle:'Cosa portare',
+      policyTeaser:(pct,h48,h24)=>`Acconto del <b>${pct}%</b> · cancellazione entro <b>${h48}h</b>: acconto perso; entro <b>${h24}h</b>: nessuna riprogrammazione.`,
+      policyReadMore:'Leggi la politica completa',
+      policyBody:(pct,h48,h24)=>`È richiesto un acconto del ${pct}% per confermare la prenotazione. Se cancelli con ${h48} ore o più di anticipo, l'acconto viene rimborsato per intero. Se cancelli tra ${h24} e ${h48} ore prima, l'acconto non è rimborsabile, ma puoi riprogrammare la data o cambiare tour senza costi aggiuntivi. Se cancelli con meno di ${h24} ore di anticipo, l'acconto viene perso senza possibilità di riprogrammare o cambiare tour. Se annulliamo noi per maltempo o condizioni del mare, il tour viene riprogrammato o cambiato senza alcuna penale per te.`
+    },
+    de: {
+      locale:'de-DE',
+      confirmado:'Bestätigt',
+      kFecha:'Datum', kHora:'Abfahrtszeit', kPunto:'Treffpunkt', kGuia:'Zugewiesener Guide',
+      reservaDe:(c,p)=>`Buchung von ${c}${p ? ` · ${p} Personen` : ""}`,
+      presentaCodigo:(g)=>`Zeige diesen Code bei der Ankunft mit <b>${g}</b>`,
+      btnCal:'Zu meinem Kalender hinzufügen', btnShare:'Ticket speichern / teilen',
+      footnote:'Fragen zu deiner Tour? Schreib uns auf WhatsApp und halte deinen Code bereit',
+      alertSinFecha:'Für diese Tour ist noch kein Datum bestätigt.',
+      alertLinkCopiado:'Link kopiert. Füge ihn dort ein, wo du ihn teilen möchtest.',
+      alertGuardarImagen:'Halte den Bildschirm gedrückt, um ein Bild zu speichern, oder nutze die Teilen-Funktion deines Browsers.',
+      shareText:(n,d,c)=>`Meine Tour: ${n} am ${d}. Code: ${c}`,
+      tuGuia:'dein Guide', porConfirmar:'Noch zu bestätigen', porAsignar:'Noch zuzuweisen',
+      packingTitle:'Was mitbringen',
+      policyTeaser:(pct,h48,h24)=>`Anzahlung von <b>${pct}%</b> · Stornierung innerhalb <b>${h48}h</b>: Anzahlung verfällt; innerhalb <b>${h24}h</b>: keine Umbuchung möglich.`,
+      policyReadMore:'Vollständige Bedingungen lesen',
+      policyBody:(pct,h48,h24)=>`Zur Bestätigung der Buchung ist eine Anzahlung von ${pct}% erforderlich. Bei Stornierung ${h48} Stunden oder mehr im Voraus wird die Anzahlung vollständig erstattet. Bei Stornierung zwischen ${h24} und ${h48} Stunden vorher ist die Anzahlung nicht erstattungsfähig, du kannst aber kostenlos auf ein anderes Datum oder eine andere Tour umbuchen. Bei Stornierung weniger als ${h24} Stunden vorher verfällt die Anzahlung vollständig, ohne Möglichkeit zur Umbuchung. Wenn wir wegen Wetter oder Meeresbedingungen absagen, wird deine Tour ohne jegliche Kosten verschoben oder getauscht.`
+    }
+  };
+
+  // Detecta el código de idioma a partir de ?lang= (código explícito) o del
+  // campo "idioma" que ya llenas en el lead (texto libre: "inglés", "English", etc.)
+  function normalizarIdioma(texto){
+    const s = (texto||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+    if(/^(en|eng)/.test(s) || /ingl|english/.test(s)) return 'en';
+    if(/^fr/.test(s) || /franc|french/.test(s)) return 'fr';
+    if(/^it/.test(s) || /ital/.test(s)) return 'it';
+    if(/^de/.test(s) || /aleman|german|deutsch/.test(s)) return 'de';
+    if(/^es/.test(s) || /espan|spanish/.test(s)) return 'es';
+    return null;
+  }
+
+  // ----- Datos del tour: se leen de la URL (los pones tú al generar el link) -----
+  const params = new URLSearchParams(window.location.search);
+  const get = (k, fallback="") => params.get(k) || fallback;
+
+  const codigoIdioma = normalizarIdioma(get("lang","")) || normalizarIdioma(get("idioma","")) || 'es';
+  const t = LANGS[codigoIdioma] || LANGS.es;
+
+  const raw = {
+    tour: get("tour", "Reef Snorkeling"),
+    tipo: get("tipo", "snorkeling"),
+    cliente: get("cliente", "María González"),
+    pax: get("pax", "2"),
+    fecha: get("fecha", "2026-07-25"),       // YYYY-MM-DD
+    hora: get("hora", "08:30"),
+    punto: get("punto", "Muelle Casas del Caribe"),
+    guia: get("guia", "José Calderón"),
+    contacto: get("contacto", ""),
+    notas: get("notas", ""),
+    ref: get("ref", "CT-2607-0182"),
+    mapa: get("mapa", ""),
+    estadoPago: get("estadoPago", ""),
+    montoPagado: get("montoPagado", ""),
+    montoPendiente: get("montoPendiente", ""),
+  };
+
+  function formatearFechaLegible(fechaISO){
+    if(!fechaISO) return t.porConfirmar;
+    const [y, m, d] = fechaISO.split("-").map(Number);
+    if(!y||!m||!d) return fechaISO;
+    const dt = new Date(y, m-1, d);
+    let texto = dt.toLocaleDateString(t.locale, { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+    texto = texto.charAt(0).toUpperCase() + texto.slice(1);
+    return texto.replace(/\./g,'');
+  }
+
+  const tourData = {
+    name: raw.tour,
+    guestLine: t.reservaDe(raw.cliente, raw.pax),
+    dateShort: formatearFechaLegible(raw.fecha),
+    time: raw.hora,
+    meetPoint: raw.punto || t.porConfirmar,
+    guide: raw.guia || t.porAsignar,
+    guideFirst: (raw.guia || "").split(" ")[0] || t.tuGuia,
+    code: raw.ref,
+    // el QR apunta al link completo de este mismo boleto, para reescanear o reenviar
+    qrContent: window.location.href
+  };
+
+  // El QR que escanea el guía siempre abre en español, sin importar el idioma del cliente
+  const qrTargetUrl = new URL(window.location.href);
+  qrTargetUrl.searchParams.set('lang', 'es');
+  qrTargetUrl.searchParams.set('staff', '1');
+  const qrTarget = qrTargetUrl.toString();
+  const esVistaGuia = params.get('staff') === '1';
+
+  // Textos fijos de la interfaz, según idioma
+  document.documentElement.lang = codigoIdioma;
+  document.querySelector('.status').textContent = t.confirmado;
+  document.querySelectorAll('.grid .k')[0].textContent = t.kFecha;
+  document.querySelectorAll('.grid .k')[1].textContent = t.kHora;
+  document.querySelectorAll('.grid .k')[2].textContent = t.kPunto;
+  document.querySelectorAll('.grid .k')[3].textContent = t.kGuia;
+  document.querySelector('.btn.primary').textContent = t.btnCal;
+  document.querySelector('.btn.secondary').textContent = t.btnShare;
+  document.querySelector('.footnote').childNodes[0].textContent = t.footnote;
+  document.getElementById('policyTeaser').innerHTML = t.policyTeaser(POLITICA.depositoPct, POLITICA.ventanaReembolsoHoras, POLITICA.ventanaReprogramarHoras);
+  document.getElementById('policySummary').textContent = t.policyReadMore;
+  document.getElementById('policyBody').textContent = t.policyBody(POLITICA.depositoPct, POLITICA.ventanaReembolsoHoras, POLITICA.ventanaReprogramarHoras);
+
+  document.getElementById('packingLabel').textContent = t.packingTitle;
+  document.getElementById('tourTag').textContent = CATEGORIA[raw.tipo] || raw.tour || tourData.name || 'Tour';
+  const itemsLlevar = (WHATTOBRING[raw.tipo] || WHATTOBRING.default)[codigoIdioma] || (WHATTOBRING[raw.tipo] || WHATTOBRING.default).es;
+  document.getElementById('packingList').innerHTML = itemsLlevar.map(i => `<li>${i}</li>`).join('');
+
+  // Datos del tour
+  document.getElementById('tourName').textContent = tourData.name;
+  document.getElementById('tourGuestLine').textContent = tourData.guestLine;
+  document.getElementById('tourDate').textContent = tourData.dateShort;
+  document.getElementById('tourTime').textContent = tourData.time;
+  document.getElementById('tourMeet').textContent = tourData.meetPoint;
+  document.getElementById('tourMeet').href = raw.mapa || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tourData.meetPoint)}`;
+  document.getElementById('tourGuide').textContent = tourData.guide;
+  document.getElementById('tourCode').textContent = tourData.code;
+  document.getElementById('codeInline').textContent = tourData.code;
+  document.querySelector('.guide-line').innerHTML = t.presentaCodigo(tourData.guideFirst);
+
+  if(esVistaGuia){
+    document.getElementById('staffBox').style.display = 'block';
+    document.getElementById('staffEstado').textContent = raw.estadoPago || 'No especificado';
+    if(raw.estadoPago === 'Parcial' && Number(raw.montoPendiente) > 0){
+      document.getElementById('staffPendienteRow').style.display = 'flex';
+      document.getElementById('staffPendiente').textContent = '$' + raw.montoPendiente;
+    }
+  }
+
+  new QRCode(document.getElementById("qrcode"), {
+    text: qrTarget,
+    width: 160,
+    height: 160,
+    colorDark: "#143238",
+    colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.M
+  });
+
+  function pad(n){ return n < 10 ? '0'+n : n; }
+
+  function addToCalendar(){
+    if(!raw.fecha){
+      alert(t.alertSinFecha);
+      return;
+    }
+    const [y, m, d] = raw.fecha.split("-").map(Number);
+    const [hh, mm] = (raw.hora || "08:00").split(":").map(Number);
+    const start = new Date(y, m-1, d, hh||8, mm||0);
+    const duracion = DURACION_HORAS[raw.tipo] || 3;
+    const end = new Date(start.getTime() + duracion*60*60*1000);
+    const fmt = dd => dd.getFullYear()+pad(dd.getMonth()+1)+pad(dd.getDate())+'T'+pad(dd.getHours())+pad(dd.getMinutes())+'00';
+
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'BEGIN:VEVENT',
+      'SUMMARY:' + tourData.name + ' — Chamorro Tours',
+      'DTSTART:' + fmt(start),
+      'DTEND:' + fmt(end),
+      'LOCATION:' + tourData.meetPoint,
+      'DESCRIPTION:' + t.kGuia + ': ' + tourData.guide + ' | Code: ' + tourData.code + ' | ' + t.policyReadMore + ': ' + t.policyBody(POLITICA.depositoPct, POLITICA.ventanaReembolsoHoras, POLITICA.ventanaReprogramarHoras).replace(/,/g,';'),
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].join('\r\n');
+
+    const blob = new Blob([ics], {type:'text/calendar'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'tour-' + tourData.code + '.ics';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function shareTicket(e){
+    e.preventDefault();
+    if (navigator.share) {
+      navigator.share({
+        title: tourData.name + ' — Chamorro Tours',
+        text: t.shareText(tourData.name, tourData.dateShort, tourData.code),
+        url: tourData.qrContent
+      }).catch(()=>{});
+    } else {
+      navigator.clipboard.writeText(tourData.qrContent).then(()=>{
+        alert(t.alertLinkCopiado);
+      }).catch(()=>{
+        alert(t.alertGuardarImagen);
+      });
+    }
+  }
+</script>
+</body>
+</html>
